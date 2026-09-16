@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "jarvis",
+  "name": "Jarvis",
+  "version": "1.0.0",
+  "author": "binoymanoj",
+  "description": "Jarvis voice assistant controller, wake word toggle, and microphone indicator",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Jarvis",
+    "description": "Voice assistant quick controls, wake word toggle, and microphone status dot",
+    "category": "Utilities",
+    "allowMultiple": false
+  }
+}
