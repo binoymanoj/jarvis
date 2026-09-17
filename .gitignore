@@ -13,3 +13,6 @@ wheels/
 .env
 *.sock
 /tmp/jarvis*
+
+# Rust build artifacts
+target/
