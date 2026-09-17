@@ -17,9 +17,9 @@ pub use wakeword::WakeWordDetector;
 pub fn resolve_models_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let candidates = [
+        PathBuf::from("/home/binoy/Codes/personal/jarvis/models"),
+        PathBuf::from("models"),
         PathBuf::from(&home).join(".config/jarvis/models"),
-        PathBuf::from("/home/binoy/Codes/personal/jarvis/src/jarvis/audio/models"),
-        PathBuf::from("src/jarvis/audio/models"),
         PathBuf::from("/usr/share/jarvis/models"),
     ];
 

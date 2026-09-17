@@ -20,9 +20,9 @@ impl JarvisHUD {
         let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
 
         let candidates = [
+            PathBuf::from("/home/binoy/Codes/personal/jarvis/ui"),
+            PathBuf::from("./ui"),
             PathBuf::from(&home).join(".config/jarvis/ui"),
-            PathBuf::from("/home/binoy/Codes/personal/jarvis/src/jarvis/ui"),
-            PathBuf::from("./src/jarvis/ui"),
             PathBuf::from("/usr/share/jarvis/ui"),
         ];
 

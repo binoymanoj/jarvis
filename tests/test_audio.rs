@@ -158,3 +158,19 @@ fn test_detect_hey_jarvis_pipewire_chunks() {
         assert!(max_q >= 0.28, "Quiet speech should be boosted by Soft AGC and detected, got {max_q}");
     }
 }
+
+#[tokio::test]
+async fn test_native_rust_tts() {
+    let config = msedge_tts::tts::SpeechConfig {
+        voice_name: "en-GB-RyanNeural".to_string(),
+        audio_format: "audio-24khz-48kbitrate-mono-mp3".to_string(),
+        pitch: 0,
+        rate: 20,
+        volume: 0,
+    };
+    let mut client = msedge_tts::tts::client::tokio_runtime::connect_async().await.unwrap();
+    let audio = client.synthesize("Hello, this is pure Rust TTS.", &config).await.unwrap();
+    assert!(!audio.audio_bytes.is_empty());
+    println!("Synthesized {} bytes of pure Rust audio!", audio.audio_bytes.len());
+}
+

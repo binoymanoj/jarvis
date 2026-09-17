@@ -9,8 +9,8 @@ use tracing::{info, warn};
 
 pub struct TextToSpeech {
     engine: String,
+    edge_voice: String,
     piper_bin: Option<PathBuf>,
-    edge_bin: Option<PathBuf>,
     piper_model: PathBuf,
     piper_config: PathBuf,
     is_speaking: Arc<AtomicBool>,
@@ -18,19 +18,13 @@ pub struct TextToSpeech {
 
 impl Default for TextToSpeech {
     fn default() -> Self {
-        Self::new("piper", "en_GB-alan-medium")
+        Self::new("edge", "en-GB-RyanNeural", "en_GB-alan-medium")
     }
 }
 
 impl TextToSpeech {
-    pub fn new(engine: &str, piper_voice: &str) -> Self {
-        let piper_bin = which::which("piper")
-            .or_else(|_| which::which("/home/binoy/Codes/personal/jarvis/.venv/bin/piper"))
-            .ok();
-
-        let edge_bin = which::which("edge-tts")
-            .or_else(|_| which::which("/home/binoy/Codes/personal/jarvis/.venv/bin/edge-tts"))
-            .ok();
+    pub fn new(engine: &str, edge_voice: &str, piper_voice: &str) -> Self {
+        let piper_bin = which::which("piper").ok();
 
         let base_models = crate::audio::resolve_models_dir();
         let piper_model = base_models.join(format!("{piper_voice}.onnx"));
@@ -38,8 +32,8 @@ impl TextToSpeech {
 
         Self {
             engine: engine.to_lowercase().trim().to_string(),
+            edge_voice: edge_voice.trim().to_string(),
             piper_bin,
-            edge_bin,
             piper_model,
             piper_config,
             is_speaking: Arc::new(AtomicBool::new(false)),
@@ -47,7 +41,11 @@ impl TextToSpeech {
     }
 
     pub fn from_settings(settings: &crate::core::config::Settings) -> Self {
-        Self::new(&settings.tts_engine, &settings.piper_voice)
+        Self::new(
+            &settings.tts_engine,
+            &settings.edge_voice,
+            &settings.piper_voice,
+        )
     }
 
     pub fn is_speaking(&self) -> bool {
@@ -109,44 +107,40 @@ impl TextToSpeech {
 
         let status = child.wait().await?;
         if !status.success() {
-            warn!("Piper synthesis failed, falling back to Edge TTS");
+            warn!("Piper synthesis failed, falling back to pure Rust Edge TTS");
             return self.speak_edge(text).await;
         }
 
         self.play_audio_file(&tmp_wav).await
     }
 
+    /// Pure Rust async Edge-TTS synthesis over WebSockets
     async fn speak_edge(&self, text: &str) -> Result<()> {
-        let edge = match self.edge_bin.as_ref() {
-            Some(b) => b,
-            None => {
-                return Err(JarvisError::Tts(
-                    "Neither Piper nor Edge TTS binary is available.".to_string(),
-                ));
-            }
+        let voice_name = if self.edge_voice.is_empty() {
+            "en-GB-RyanNeural"
+        } else {
+            &self.edge_voice
         };
 
+        let config = msedge_tts::tts::SpeechConfig {
+            voice_name: voice_name.to_string(),
+            audio_format: "audio-24khz-48kbitrate-mono-mp3".to_string(),
+            pitch: 0,
+            rate: 20,
+            volume: 0,
+        };
+
+        let mut client = msedge_tts::tts::client::tokio_runtime::connect_async()
+            .await
+            .map_err(|e| JarvisError::Tts(format!("Failed to connect to Edge TTS: {e}")))?;
+
+        let audio = client
+            .synthesize(text, &config)
+            .await
+            .map_err(|e| JarvisError::Tts(format!("Edge TTS synthesis failed: {e}")))?;
+
         let tmp_mp3 = PathBuf::from("/tmp/jarvis_speech.mp3");
-
-        let status = Command::new(edge)
-            .arg("--voice")
-            .arg("en-GB-RyanNeural")
-            .arg("--rate=+20%")
-            .arg("--text")
-            .arg(text)
-            .arg("--write-media")
-            .arg(&tmp_mp3)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await?;
-
-        if !status.success() {
-            return Err(JarvisError::Tts(format!(
-                "Edge-TTS synthesis failed with status {:?}",
-                status.code()
-            )));
-        }
+        tokio::fs::write(&tmp_mp3, &audio.audio_bytes).await?;
 
         self.play_audio_file(&tmp_mp3).await
     }

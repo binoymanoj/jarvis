@@ -22,6 +22,7 @@ pub struct Settings {
 
     // Text-to-Speech
     pub tts_engine: String,
+    pub edge_voice: String,
     pub piper_voice: String,
 
     // Audio recording & VAD settings
@@ -52,7 +53,8 @@ impl Default for Settings {
             stt_engine: "groq".to_string(),
             whisper_model: "whisper-large-v3-turbo".to_string(),
             local_whisper_size: "base.en".to_string(),
-            tts_engine: "piper".to_string(),
+            tts_engine: "edge".to_string(),
+            edge_voice: "en-GB-RyanNeural".to_string(),
             piper_voice: "en_GB-alan-medium".to_string(),
             sample_rate: 16000,
             channels: 1,
@@ -117,6 +119,9 @@ impl Settings {
         }
         if let Ok(val) = env::var("JARVIS_TTS_ENGINE") {
             s.tts_engine = val;
+        }
+        if let Ok(val) = env::var("JARVIS_EDGE_VOICE") {
+            s.edge_voice = val;
         }
         if let Ok(val) = env::var("JARVIS_VOICE") {
             s.piper_voice = val;
@@ -201,7 +206,8 @@ mod tests {
         assert_eq!(settings.channels, 1);
         assert_eq!(settings.model_name, "gemini-3.5-flash-lite");
         assert_eq!(settings.cli_ai_tool, "claude");
-        assert_eq!(settings.tts_engine, "piper");
+        assert_eq!(settings.tts_engine, "edge");
+        assert_eq!(settings.edge_voice, "en-GB-RyanNeural");
         assert!(settings.wakeword_enabled);
     }
 
