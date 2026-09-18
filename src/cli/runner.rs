@@ -573,24 +573,27 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
     }
 
     // Status display
-    println!("\x1b[1;36m󰚩 Omarchy Jarvis\x1b[0m v0.2.0 (Rust Native)");
-    println!("\x1b[2mArchitecture:\x1b[0m x86_64-unknown-linux-gnu");
-    println!("\x1b[2mModel:\x1b[0m        {}", settings.model_name);
-    println!("\x1b[2mSTT:\x1b[0m          {} ({})", settings.stt_engine, settings.whisper_model);
-    println!("\x1b[2mTTS:\x1b[0m          {} ({})", settings.tts_engine, settings.piper_voice);
+    println!("\x1b[1;36m󰚩 Omarchy Jarvis\x1b[0m v0.2.0 (100% Rust Native)");
+    println!("\x1b[2mArchitecture:\x1b[0m     x86_64-unknown-linux-gnu");
+    println!("\x1b[2mAI Provider:\x1b[0m      \x1b[1m{}\x1b[0m", settings.ai_provider);
+    println!("\x1b[2mReasoning Model:\x1b[0m  {}", settings.model_name);
+    println!("\x1b[2mWake Word:\x1b[0m        '{}' (threshold: {:.2})", settings.wakeword_name, settings.wakeword_threshold);
+    println!("\x1b[2mEditor / Terminal:\x1b[0m {} via {}", settings.editor, settings.terminal);
+    println!("\x1b[2mSTT Engine:\x1b[0m       {} ({})", settings.stt_engine, settings.whisper_model);
+    println!("\x1b[2mTTS Engine:\x1b[0m       {} ({})", settings.tts_engine, if settings.tts_engine == "edge" { &settings.edge_voice } else { &settings.piper_voice });
 
-    let gemini_status = if settings.gemini_api_key.is_some() {
-        "\x1b[32mConfigured\x1b[0m"
-    } else {
-        "\x1b[33mMissing (set in .env)\x1b[0m"
+    let active_key_status = match settings.require_active_provider_key() {
+        Ok(_) => "\x1b[32mConfigured\x1b[0m",
+        Err(_) => "\x1b[33mMissing (configure in ~/.config/jarvis/config.toml or .env)\x1b[0m",
     };
+    println!("\x1b[2mActive API Key:\x1b[0m   {active_key_status}");
+
     let groq_status = if settings.groq_api_key.is_some() {
         "\x1b[32mConfigured\x1b[0m"
     } else {
-        "\x1b[33mMissing (set in .env)\x1b[0m"
+        "\x1b[33mMissing (set GROQ_API_KEY for fast Whisper)\x1b[0m"
     };
-    println!("\x1b[2mGoogle Gemini API Key:\x1b[0m {gemini_status}");
-    println!("\x1b[2mGroq Whisper API Key:\x1b[0m  {groq_status}");
+    println!("\x1b[2mGroq Whisper Key:\x1b[0m {groq_status}");
 
     let st = read_status();
     let daemon_str = if st.daemon_running {
@@ -598,7 +601,7 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
     } else {
         "\x1b[2mInactive\x1b[0m"
     };
-    println!("\x1b[2mBackground Daemon:\x1b[0m     {daemon_str}");
+    println!("\x1b[2mBackground Daemon:\x1b[0m {daemon_str}");
 
     Ok(())
 }

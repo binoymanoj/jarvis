@@ -6,12 +6,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[test]
-fn test_all_50_tools_registered() {
+fn test_all_51_tools_registered() {
     let settings = Settings::default();
     let flag = Arc::new(AtomicBool::new(false));
     let reg = build_tool_registry(&settings, flag);
 
-    assert_eq!(reg.count(), 50);
+    assert_eq!(reg.count(), 51);
 
     let tools = [
         "switch_workspace", "focus_application", "close_active_window",
@@ -27,7 +27,7 @@ fn test_all_50_tools_registered() {
         "open_url", "search_web", "open_youtube", "inspect_screen",
         "schedule_event", "set_reminder", "list_reminders", "clear_reminders",
         "draft_email", "create_note", "list_notes", "create_project",
-        "delegate_to_antigravity", "dismiss_session",
+        "delegate_to_antigravity", "open_file_in_editor", "dismiss_session",
     ];
 
     for t in tools {

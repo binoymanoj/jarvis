@@ -8,6 +8,18 @@
 > **Full Performance & Specs Reference**: See [docs/PERFORMANCE_AND_SPECS.md](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)  
 > **Document Status**: Living roadmap and master architectural blueprint.
 
+󰚩 Omarchy Jarvis v0.2.0 (100% Rust Native)
+  Architecture:     x86_64-unknown-linux-gnu
+  AI Provider:      gemini
+  Reasoning Model:  gemini-3.5-flash-lite
+  Wake Word:        'jarvis' (threshold: 0.22)
+  Editor / Terminal: nvim via kitty
+  STT Engine:       groq (whisper-large-v3-turbo)
+  TTS Engine:       edge (en-GB-RyanNeural)
+  Active API Key:   Configured
+  Groq Whisper Key: Configured
+  Background Daemon: Active
+
 
 ---
 

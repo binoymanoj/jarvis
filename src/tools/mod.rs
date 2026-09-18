@@ -1,6 +1,7 @@
 pub mod calendar;
 pub mod clipboard;
 pub mod coding_cli;
+pub mod editor;
 pub mod email;
 pub mod hyprland;
 pub mod media;
@@ -242,7 +243,10 @@ pub fn build_tool_registry(settings: &Settings, session_ended_flag: Arc<AtomicBo
     reg.register(coding_cli::CreateProjectTool::new(coding_cli.clone()));
     reg.register(coding_cli::DelegateToAntigravityTool::new(coding_cli));
 
-    // 16. Dismiss Session Tool (1)
+    // 16. Register Editor Tools (1)
+    reg.register(editor::OpenFileInEditorTool::new(&settings.editor, &settings.terminal, &settings.project_dirs));
+
+    // 17. Dismiss Session Tool (1)
     reg.register(DismissSessionTool::new(session_ended_flag));
 
     reg
@@ -258,8 +262,8 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let registry = build_tool_registry(&settings, flag);
 
-        // All 50 native tools must be successfully registered!
-        assert_eq!(registry.count(), 50);
+        // All 51 native tools must be successfully registered!
+        assert_eq!(registry.count(), 51);
 
         // Ensure key tools are retrievable
         assert!(registry.get("switch_workspace").is_some());
@@ -268,12 +272,13 @@ mod tests {
         assert!(registry.get("media_play_pause").is_some());
         assert!(registry.get("launch_workflow").is_some());
         assert!(registry.get("create_project").is_some());
+        assert!(registry.get("open_file_in_editor").is_some());
         assert!(registry.get("dismiss_session").is_some());
 
         // Verify Gemini function declarations format
         let decls = registry.gemini_function_declarations();
         assert!(decls.is_array());
         let list = decls[0]["functionDeclarations"].as_array().unwrap();
-        assert_eq!(list.len(), 50);
+        assert_eq!(list.len(), 51);
     }
 }

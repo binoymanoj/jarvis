@@ -13,6 +13,7 @@ use tracing::{info, warn};
 
 pub struct WakeWordDetector {
     enabled: bool,
+    name: String,
     threshold: f32,
     cooldown: Duration,
     last_trigger: Instant,
@@ -46,7 +47,18 @@ impl WakeWordDetector {
         let models_dir = crate::audio::resolve_models_dir();
         let mel_path = models_dir.join("melspectrogram.onnx");
         let emb_path = models_dir.join("embedding_model.onnx");
-        let ww_path = models_dir.join("hey_jarvis_v0.1.onnx");
+
+        let ww_filename = if settings.wakeword_model.ends_with(".onnx") {
+            settings.wakeword_model.clone()
+        } else {
+            format!("{}.onnx", settings.wakeword_model)
+        };
+
+        let ww_path = if std::path::Path::new(&ww_filename).is_absolute() {
+            std::path::PathBuf::from(&ww_filename)
+        } else {
+            models_dir.join(&ww_filename)
+        };
 
         let melspec_session = if mel_path.exists() {
             Session::builder().and_then(|mut b| b.commit_from_file(&mel_path)).ok()
@@ -63,11 +75,19 @@ impl WakeWordDetector {
         let wakeword_session = if ww_path.exists() {
             Session::builder().and_then(|mut b| b.commit_from_file(&ww_path)).ok()
         } else {
-            None
+            // Fall back to hey_jarvis_v0.1.onnx if custom model not found
+            let fallback_ww = models_dir.join("hey_jarvis_v0.1.onnx");
+            Session::builder().and_then(|mut b| b.commit_from_file(&fallback_ww)).ok()
+        };
+
+        let display_name = if settings.wakeword_name.eq_ignore_ascii_case("jarvis") {
+            "Jarvis / Hey Jarvis".to_string()
+        } else {
+            settings.wakeword_name.clone()
         };
 
         if melspec_session.is_some() && embedding_session.is_some() && wakeword_session.is_some() {
-            info!("Local 'Hey Jarvis' ONNX wake word engine initialized successfully (threshold: {})", settings.wakeword_threshold);
+            info!("Local '{}' ONNX wake word engine initialized successfully (model: {:?}, threshold: {})", display_name, ww_path.file_name().unwrap_or_default(), settings.wakeword_threshold);
         } else {
             warn!("One or more wake word ONNX models not found in {:?}. Wake word detection will run in standby mode.", models_dir);
         }
@@ -78,6 +98,7 @@ impl WakeWordDetector {
 
         Self {
             enabled: settings.wakeword_enabled,
+            name: display_name,
             threshold: settings.wakeword_threshold,
             cooldown: Duration::from_millis(1500),
             last_trigger: Instant::now() - Duration::from_secs(10),
@@ -119,9 +140,6 @@ impl WakeWordDetector {
                     frame.push(s);
                 }
             }
-
-            // Apply Soft AGC to bring voice energy into openWakeWord's nominal range (~5500 RMS)
-            AudioCapture::apply_soft_agc(&mut frame);
 
             for &s in &frame {
                 self.raw_buffer.push_back(s);
@@ -287,7 +305,7 @@ impl WakeWordDetector {
         F: FnMut() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = ()> + Send + 'static,
     {
-        info!("Starting background wake word listener ('Hey Jarvis')...");
+        info!("Starting background wake word listener ('{}')...", self.name);
         let capture = AudioCapture::new(16000, 1);
         let chunk_size = 1280; // 80ms at 16kHz
 
@@ -340,7 +358,7 @@ impl WakeWordDetector {
 
                 let (detected, score) = self.process_chunk(&chunk);
                 if detected {
-                    info!("󰚩 Wake word 'Hey Jarvis' detected! (score: {:.2})", score);
+                    info!("󰚩 Wake word '{}' detected! (score: {:.2})", self.name, score);
                     drop(_stream); // Release mic stream for conversational recording turn
                     sleep(Duration::from_millis(50)).await;
                     play_wake_chime().await;

@@ -21,7 +21,7 @@ pub struct AudioRecorder {
 
 impl Default for AudioRecorder {
     fn default() -> Self {
-        Self::new(16000, 512, 0.85, 20.0, 0.35, 0.003)
+        Self::new(16000, 512, 1.3, 25.0, 0.28, 0.0008)
     }
 }
 
@@ -55,8 +55,8 @@ impl AudioRecorder {
             512,
             settings.silence_threshold_seconds,
             settings.max_recording_seconds,
-            0.35,
-            0.003,
+            0.28,
+            0.0008,
         )
     }
 
@@ -157,8 +157,14 @@ impl AudioRecorder {
         }
 
         if !speech_started && !self.stop_requested.load(Ordering::SeqCst) {
-            debug!("No speech detected in audio stream. Discarding.");
-            return Ok(Vec::new());
+            let total_rms = AudioCapture::compute_rms(&recorded_samples);
+            // If the user spoke anything audible (>30 RMS) for at least 0.35 seconds, do NOT discard it!
+            if recorded_samples.len() >= 16000 * 35 / 100 && total_rms > 30.0 {
+                info!("Audible sound detected in recording (RMS {:.1}, {} samples). Sending to transcription.", total_rms, recorded_samples.len());
+            } else {
+                debug!("No speech detected in audio stream (RMS {:.1}). Discarding.", total_rms);
+                return Ok(Vec::new());
+            }
         }
 
         if recorded_samples.is_empty() {

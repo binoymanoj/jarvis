@@ -2,6 +2,7 @@ use crate::ai::fallback::FallbackCoordinator;
 use crate::ai::gemini::{
     ContentMessage, GenerateContentRequest, GenerationConfig, GeminiClient, SystemInstruction, SystemPart,
 };
+use crate::ai::providers::AIClient;
 use crate::core::config::Settings;
 use crate::core::error::{JarvisError, Result};
 use crate::tools::hyprland::HyprlandController;
@@ -9,7 +10,7 @@ use crate::tools::screen::ScreenPerception;
 use crate::tools::{build_tool_registry, ToolRegistry};
 use chrono::Local;
 use regex::Regex;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
@@ -22,7 +23,7 @@ You allow the user to operate their computer completely hands-free.
 Core Guidelines:
 1. Tone: Calm, sophisticated, polite, and efficient (reminiscent of the British assistant persona).
 2. Spoken Answers (CRITICAL - MAXIMUM BREVITY):
-   - For all action commands, tool executions, and system tasks (e.g., switching workspaces, closing tabs/windows, adjusting volume/brightness, typing, launching apps, media controls, terminal commands): Reply with ONLY 1 OR 2 WORDS (e.g., "Right away.", "Done.", "Switched.", "Closed.", "On it."). NEVER speak full explanatory sentences like "I have switched to workspace 3 for you, sir." or "I've closed the tab." The user requires instantaneous confirmation so they can immediately issue their next command without waiting.
+   - For all action commands, tool executions, and system tasks (e.g., switching workspaces, closing tabs/windows, adjusting volume/brightness, typing, launching apps, media controls, terminal commands, opening editor): Reply with ONLY 1 OR 2 WORDS (e.g., "Right away.", "Done.", "Switched.", "Closed.", "On it.", "Opened."). NEVER speak full explanatory sentences like "I have switched to workspace 3 for you, sir." or "I've closed the tab." The user requires instantaneous confirmation so they can immediately issue their next command without waiting.
    - For informational questions or perceptions (e.g., questions, screen perception, system stats, notes): Keep your response to 1 brief, direct sentence maximum.
 3. System & Window Management:
    - Control windows, workspaces, volume, brightness, and system themes (`switch_workspace`, `focus_application`, `adjust_volume`, `set_theme`, etc.).
@@ -59,8 +60,11 @@ Core Guidelines:
    - When asked to create, scaffold, or generate a project, codebase, application, or complex code task (e.g., "create a project called...", "create a react app"), call `create_project`.
    - If the user asks for a popup, interactive terminal, pass `open_terminal=True`.
    - For general tasks, documents, notes, or scripts to delegate to the CLI AI tool, call `delegate_to_antigravity`.
-14. Screen Perception: If the user asks you to look at their screen, inspect a window, or diagnose an error, call `inspect_screen`.
-15. Ongoing Conversation & Dismissal:
+14. Project File Navigation & Code Editing:
+   - When asked to open, edit, or view any file from a project or codebase (e.g., "open models.go file from the project tracky researcher tui project in a new neovim instance", "open main.rs in nvim"), immediately call `open_file_in_editor(project_name="...", file_path="...", editor="nvim")`.
+   - Jarvis will automatically locate the project directory in ~/Codes/personal, ~/Codes, or ~/Projects, find the file, and launch the editor in a new terminal window.
+15. Screen Perception: If the user asks you to look at their screen, inspect a window, or diagnose an error, call `inspect_screen`.
+16. Ongoing Conversation & Dismissal:
    - Jarvis maintains conversational context across sequential commands within the same session.
    - When the user indicates they are finished, done, or dismisses you (e.g., "that's it", "done", "that's all", "goodbye"), acknowledge politely and call `dismiss_session`.
 "#;
@@ -109,13 +113,18 @@ pub fn is_exit_command(text: &str) -> bool {
 }
 
 pub struct JarvisAgent {
-    client: Option<GeminiClient>,
+    ai_client: Option<AIClient>,
+    gemini_client: Option<GeminiClient>,
     fallback: Arc<Mutex<FallbackCoordinator>>,
     registry: Arc<ToolRegistry>,
     hyprland: Arc<HyprlandController>,
     screen: Arc<ScreenPerception>,
-    history: Arc<Mutex<Vec<ContentMessage>>>,
+    gemini_history: Arc<Mutex<Vec<ContentMessage>>>,
+    openai_history: Arc<Mutex<Vec<Value>>>,
+    anthropic_history: Arc<Mutex<Vec<Value>>>,
     session_ended: Arc<AtomicBool>,
+    provider_name: String,
+    model_name: String,
 }
 
 impl JarvisAgent {
@@ -125,27 +134,43 @@ impl JarvisAgent {
         let hyprland = Arc::new(HyprlandController::new());
         let screen = Arc::new(ScreenPerception::new(hyprland.clone()));
 
-        let client = settings.gemini_api_key.as_ref().map(|k| GeminiClient::new(k));
+        let ai_client = AIClient::from_settings(settings).ok();
+        let gemini_client = settings.gemini_api_key.as_ref().map(|k| GeminiClient::new(k));
         let fallback = Arc::new(Mutex::new(FallbackCoordinator::new(
             Some(&settings.model_name),
             None,
         )));
 
         Self {
-            client,
+            ai_client,
+            gemini_client,
             fallback,
             registry,
             hyprland,
             screen,
-            history: Arc::new(Mutex::new(Vec::new())),
+            gemini_history: Arc::new(Mutex::new(Vec::new())),
+            openai_history: Arc::new(Mutex::new(Vec::new())),
+            anthropic_history: Arc::new(Mutex::new(Vec::new())),
             session_ended,
+            provider_name: settings.ai_provider.clone(),
+            model_name: settings.model_name.clone(),
         }
     }
 
     /// Reset chat history and session termination state
     pub async fn reset_session(&self) {
-        let mut hist = self.history.lock().await;
-        hist.clear();
+        {
+            let mut hist = self.gemini_history.lock().await;
+            hist.clear();
+        }
+        {
+            let mut hist = self.openai_history.lock().await;
+            hist.clear();
+        }
+        {
+            let mut hist = self.anthropic_history.lock().await;
+            hist.clear();
+        }
         self.session_ended.store(false, Ordering::SeqCst);
         let mut fb = self.fallback.lock().await;
         fb.reset();
@@ -171,7 +196,7 @@ impl JarvisAgent {
         format!("[Context: CurrentTime='{now}', Focused='{win_title}' ({win_class}), Workspace={workspace_id}]")
     }
 
-    /// Process user prompt through Gemini reasoning loop with automatic tool execution and quota fallback
+    /// Process user prompt through active AI provider reasoning loop with automatic tool execution
     pub async fn process_prompt(&self, prompt: &str) -> Result<String> {
         let trimmed = prompt.trim();
         if trimmed.is_empty() {
@@ -185,27 +210,39 @@ impl JarvisAgent {
             return Ok("Very well, sir. Have a wonderful day.".to_string());
         }
 
-        let client = match &self.client {
+        let ai_client = match &self.ai_client {
             Some(c) => c,
             None => {
-                warn!("GEMINI_API_KEY not configured.");
-                return Ok("I require a Google Gemini API key to operate, sir. Please configure it in your environment.".to_string());
+                warn!("API key for provider '{}' not configured.", self.provider_name);
+                return Ok(format!(
+                    "I require an API key for provider '{}', sir. Please configure it in ~/.config/jarvis/config.toml or your environment.",
+                    self.provider_name
+                ));
             }
         };
 
         let context = self.get_system_context().await;
         let turn_content = format!("{context}\n{trimmed}");
 
-        // Append user turn to conversation history
+        match ai_client {
+            AIClient::Gemini(client) => self.process_gemini(client, &turn_content).await,
+            AIClient::OpenAI(client) => self.process_openai(client, &turn_content).await,
+            AIClient::Anthropic(client) => self.process_anthropic(client, &turn_content).await,
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Google Gemini Loop
+    // -------------------------------------------------------------------------
+    async fn process_gemini(&self, client: &GeminiClient, turn_content: &str) -> Result<String> {
         {
-            let mut hist = self.history.lock().await;
+            let mut hist = self.gemini_history.lock().await;
             hist.push(ContentMessage {
                 role: "user".to_string(),
                 parts: vec![json!({ "text": turn_content })],
             });
         }
 
-        // Model reasoning and tool call execution loop with fallback
         const MAX_TOOL_TURNS: usize = 5;
 
         loop {
@@ -214,7 +251,7 @@ impl JarvisAgent {
                 fb.current_model().to_string()
             };
 
-            info!("Reasoning with model [{active_model}]: \"{trimmed}\"");
+            info!("Reasoning with Gemini [{active_model}]: \"{}\"", turn_content.lines().last().unwrap_or_default());
 
             let mut tool_turn = 0;
             let mut model_succeeded = false;
@@ -225,7 +262,7 @@ impl JarvisAgent {
                 tool_turn += 1;
 
                 let current_history = {
-                    let hist = self.history.lock().await;
+                    let hist = self.gemini_history.lock().await;
                     hist.clone()
                 };
 
@@ -253,7 +290,6 @@ impl JarvisAgent {
                     }
                 };
 
-                // Parse candidate
                 let candidate = match response.candidates.and_then(|mut c| if c.is_empty() { None } else { Some(c.remove(0)) }) {
                     Some(c) => c,
                     None => {
@@ -272,7 +308,6 @@ impl JarvisAgent {
                     }
                 };
 
-                // Extract function calls from content parts
                 let mut function_calls = Vec::new();
                 for part in &content.parts {
                     if let Some(call) = part.get("functionCall") {
@@ -283,7 +318,6 @@ impl JarvisAgent {
                 }
 
                 if function_calls.is_empty() {
-                    // Final text response
                     for part in &content.parts {
                         if let Some(txt) = part.get("text").and_then(|t| t.as_str()) {
                             if !txt.trim().is_empty() {
@@ -296,67 +330,24 @@ impl JarvisAgent {
                         final_text_reply = "Done, sir.".to_string();
                     }
 
-                    // Record model answer in history
                     {
-                        let mut hist = self.history.lock().await;
+                        let mut hist = self.gemini_history.lock().await;
                         hist.push(content);
                     }
                     model_succeeded = true;
                     break;
                 }
 
-                // Append model message (with exact function calls and thought signatures) to history
                 {
-                    let mut hist = self.history.lock().await;
+                    let mut hist = self.gemini_history.lock().await;
                     hist.push(content);
                 }
 
-                // Execute function calls
                 for (call_name, call_args) in function_calls {
-                    info!("Executing tool call: {call_name}({call_args:?})");
+                    let result_str = self.execute_tool_action(&call_name, call_args, &active_model).await;
 
-                    let result_str = if call_name == "dismiss_session" {
-                        self.session_ended.store(true, Ordering::SeqCst);
-                        let farewell = call_args["farewell"]
-                            .as_str()
-                            .unwrap_or("Very well, sir. Have a wonderful day.");
-                        farewell.to_string()
-                    } else if call_name == "inspect_screen" {
-                        let query = call_args["query"].as_str().unwrap_or("analyze this screen");
-                        let target = call_args["target"].as_str().unwrap_or("active_window");
-
-                        let capture_result = if target == "fullscreen" {
-                            self.screen.capture_full_screen(None).await
-                        } else {
-                            self.screen.capture_active_window(None).await
-                        };
-
-                        match capture_result {
-                            Ok(path) => {
-                                let vision_res = match fs::read(&path) {
-                                    Ok(bytes) => {
-                                        client.analyze_image(&active_model, &bytes, query).await
-                                            .unwrap_or_else(|e| format!("Vision analysis failed: {e}"))
-                                    }
-                                    Err(e) => format!("Failed to read capture file: {e}"),
-                                };
-                                let _ = fs::remove_file(&path);
-                                vision_res
-                            }
-                            Err(e) => format!("Screenshot capture failed: {e}"),
-                        }
-                    } else {
-                        match self.registry.execute_tool(&call_name, call_args).await {
-                            Ok(out) => out,
-                            Err(e) => format!("Tool execution failed: {e}"),
-                        }
-                    };
-
-                    debug!("Tool result for {call_name}: {result_str}");
-
-                    // Append functionResponse to history (with role "user" per Gemini v1beta specification)
                     {
-                        let mut hist = self.history.lock().await;
+                        let mut hist = self.gemini_history.lock().await;
                         hist.push(ContentMessage {
                             role: "user".to_string(),
                             parts: vec![json!({
@@ -391,6 +382,252 @@ impl JarvisAgent {
             return Ok("I have completed the requested operations, sir.".to_string());
         }
     }
+
+    // -------------------------------------------------------------------------
+    // OpenAI-Compatible Loop (OpenAI, Groq, OpenRouter)
+    // -------------------------------------------------------------------------
+    async fn process_openai(&self, client: &crate::ai::providers::OpenAICompatibleClient, turn_content: &str) -> Result<String> {
+        let tools_val = {
+            let mut tools = Vec::new();
+            for tool in self.registry.all() {
+                tools.push(json!({
+                    "type": "function",
+                    "function": {
+                        "name": tool.name(),
+                        "description": tool.description(),
+                        "parameters": tool.parameters_schema()
+                    }
+                }));
+            }
+            json!(tools)
+        };
+
+        {
+            let mut hist = self.openai_history.lock().await;
+            if hist.is_empty() {
+                hist.push(json!({
+                    "role": "system",
+                    "content": SYSTEM_INSTRUCTION
+                }));
+            }
+            hist.push(json!({
+                "role": "user",
+                "content": turn_content
+            }));
+        }
+
+        const MAX_TOOL_TURNS: usize = 5;
+        let mut tool_turn = 0;
+
+        while tool_turn < MAX_TOOL_TURNS {
+            tool_turn += 1;
+
+            let current_messages = {
+                let hist = self.openai_history.lock().await;
+                hist.clone()
+            };
+
+            let response = client.chat_completion(&self.model_name, &current_messages, Some(tools_val.clone())).await?;
+
+            if response.tool_calls.is_empty() {
+                let reply = response.text.unwrap_or_else(|| "Done, sir.".to_string());
+                {
+                    let mut hist = self.openai_history.lock().await;
+                    hist.push(json!({
+                        "role": "assistant",
+                        "content": reply
+                    }));
+                }
+                info!("Jarvis Response: \"{reply}\"");
+                return Ok(reply);
+            }
+
+            // Append assistant message with tool calls
+            let mut raw_calls = Vec::new();
+            for tc in &response.tool_calls {
+                raw_calls.push(json!({
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": tc.args.to_string()
+                    }
+                }));
+            }
+
+            {
+                let mut hist = self.openai_history.lock().await;
+                hist.push(json!({
+                    "role": "assistant",
+                    "content": response.text,
+                    "tool_calls": raw_calls
+                }));
+            }
+
+            // Execute each tool call and push result
+            for tc in response.tool_calls {
+                let result_str = self.execute_tool_action(&tc.name, tc.args, &self.model_name).await;
+
+                {
+                    let mut hist = self.openai_history.lock().await;
+                    hist.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result_str
+                    }));
+                }
+            }
+        }
+
+        Ok("Done, sir.".to_string())
+    }
+
+    // -------------------------------------------------------------------------
+    // Anthropic Claude Loop
+    // -------------------------------------------------------------------------
+    async fn process_anthropic(&self, client: &crate::ai::providers::AnthropicClient, turn_content: &str) -> Result<String> {
+        let tools_val = {
+            let mut tools = Vec::new();
+            for tool in self.registry.all() {
+                tools.push(json!({
+                    "name": tool.name(),
+                    "description": tool.description(),
+                    "input_schema": tool.parameters_schema()
+                }));
+            }
+            json!(tools)
+        };
+
+        {
+            let mut hist = self.anthropic_history.lock().await;
+            hist.push(json!({
+                "role": "user",
+                "content": turn_content
+            }));
+        }
+
+        const MAX_TOOL_TURNS: usize = 5;
+        let mut tool_turn = 0;
+
+        while tool_turn < MAX_TOOL_TURNS {
+            tool_turn += 1;
+
+            let current_messages = {
+                let hist = self.anthropic_history.lock().await;
+                hist.clone()
+            };
+
+            let response = client.create_message(&self.model_name, SYSTEM_INSTRUCTION, &current_messages, Some(tools_val.clone())).await?;
+
+            if response.tool_calls.is_empty() {
+                let reply = response.text.unwrap_or_else(|| "Done, sir.".to_string());
+                {
+                    let mut hist = self.anthropic_history.lock().await;
+                    hist.push(json!({
+                        "role": "assistant",
+                        "content": reply
+                    }));
+                }
+                info!("Jarvis Response: \"{reply}\"");
+                return Ok(reply);
+            }
+
+            // Append assistant message with tool_use blocks
+            let mut assistant_content = Vec::new();
+            if let Some(ref txt) = response.text {
+                assistant_content.push(json!({
+                    "type": "text",
+                    "text": txt
+                }));
+            }
+            for tc in &response.tool_calls {
+                assistant_content.push(json!({
+                    "type": "tool_use",
+                    "id": tc.id,
+                    "name": tc.name,
+                    "input": tc.args
+                }));
+            }
+
+            {
+                let mut hist = self.anthropic_history.lock().await;
+                hist.push(json!({
+                    "role": "assistant",
+                    "content": assistant_content
+                }));
+            }
+
+            // Execute tool calls and push tool_result blocks in a single user message
+            let mut tool_results = Vec::new();
+            for tc in response.tool_calls {
+                let result_str = self.execute_tool_action(&tc.name, tc.args, &self.model_name).await;
+                tool_results.push(json!({
+                    "type": "tool_result",
+                    "tool_use_id": tc.id,
+                    "content": result_str
+                }));
+            }
+
+            {
+                let mut hist = self.anthropic_history.lock().await;
+                hist.push(json!({
+                    "role": "user",
+                    "content": tool_results
+                }));
+            }
+        }
+
+        Ok("Done, sir.".to_string())
+    }
+
+    /// Common tool execution logic across all AI providers
+    async fn execute_tool_action(&self, call_name: &str, call_args: Value, active_model: &str) -> String {
+        info!("Executing tool call: {call_name}({call_args:?})");
+
+        let result_str = if call_name == "dismiss_session" {
+            self.session_ended.store(true, Ordering::SeqCst);
+            let farewell = call_args["farewell"]
+                .as_str()
+                .unwrap_or("Very well, sir. Have a wonderful day.");
+            farewell.to_string()
+        } else if call_name == "inspect_screen" {
+            let query = call_args["query"].as_str().unwrap_or("analyze this screen");
+            let target = call_args["target"].as_str().unwrap_or("active_window");
+
+            let capture_result = if target == "fullscreen" {
+                self.screen.capture_full_screen(None).await
+            } else {
+                self.screen.capture_active_window(None).await
+            };
+
+            match capture_result {
+                Ok(path) => {
+                    let vision_res = if let Some(ref client) = self.gemini_client {
+                        match fs::read(&path) {
+                            Ok(bytes) => {
+                                client.analyze_image(active_model, &bytes, query).await
+                                    .unwrap_or_else(|e| format!("Vision analysis failed: {e}"))
+                            }
+                            Err(e) => format!("Failed to read capture file: {e}"),
+                        }
+                    } else {
+                        "Screenshot captured, but Gemini API key is required for visual analysis.".to_string()
+                    };
+                    let _ = fs::remove_file(&path);
+                    vision_res
+                }
+                Err(e) => format!("Screenshot capture failed: {e}"),
+            }
+        } else {
+            match self.registry.execute_tool(call_name, call_args).await {
+                Ok(out) => out,
+                Err(e) => format!("Tool execution failed: {e}"),
+            }
+        };
+
+        debug!("Tool result for {call_name}: {result_str}");
+        result_str
+    }
 }
 
 #[cfg(test)]
@@ -410,5 +647,6 @@ mod tests {
         assert!(!is_exit_command("open youtube"));
         assert!(!is_exit_command("type hello world"));
         assert!(!is_exit_command("schedule a meeting"));
+        assert!(!is_exit_command("open models.go file from the project tracky researcher tui project in a new neovim instance"));
     }
 }

@@ -1,0 +1,65 @@
+# ==============================================================================
+# Jarvis Configuration File
+# Default location: ~/.config/jarvis/config.toml (or ./config.toml)
+# ==============================================================================
+
+[ai]
+# AI Provider: "gemini" (free default), "openai", "anthropic" (claude), "groq", "openrouter"
+provider = "gemini"
+
+# Model name for chosen provider:
+# - Gemini: "gemini-3.5-flash-lite", "gemini-2.5-flash"
+# - OpenAI: "gpt-4o", "gpt-4o-mini"
+# - Anthropic: "claude-3-7-sonnet-latest", "claude-3-5-haiku-latest"
+# - Groq: "llama-3.3-70b-versatile"
+# - OpenRouter: "anthropic/claude-3.7-sonnet", "deepseek/deepseek-r1"
+model = "gemini-3.5-flash-lite"
+
+# Provider API Keys (leave empty to use .env or environment variables)
+gemini_api_key = ""
+openai_api_key = ""
+anthropic_api_key = ""
+groq_api_key = ""
+openrouter_api_key = ""
+
+# Autonomous coding CLI assistant ("claude", "codex", "agy")
+cli_tool = "claude"
+
+[wakeword]
+# Background wake word detection active in daemon
+enabled = true
+
+# Wake word name: "jarvis" / "hey jarvis" (default), "alexa", "hey_mycroft", "hey_rhasspy"
+name = "jarvis"
+
+# Sensitivity threshold (0.15 - 0.50). Lower is more sensitive for quiet speech. Default: 0.22
+threshold = 0.22
+
+# Optional custom ONNX model path (relative to models dir or absolute)
+# model_path = "models/hey_jarvis_v0.1.onnx"
+
+[editor]
+# Code editor to open project files with ("nvim", "neovim", "code", "helix")
+default = "nvim"
+
+# Terminal emulator used to host the editor ("kitty", "foot")
+terminal = "kitty"
+
+# Project search directories (searched when asking e.g. "open models.go from tracky-researcher-tui")
+project_dirs = ["~/Codes/personal", "~/Codes", "~/Projects", "~"]
+
+[audio]
+# Speech-to-Text engine ("groq" or "local")
+stt_engine = "groq"
+whisper_model = "whisper-large-v3-turbo"
+
+# Text-to-Speech engine: "edge" (pure Rust WebSocket, zero latency) or "piper" (offline C++)
+tts_engine = "edge"
+edge_voice = "en-GB-RyanNeural"
+piper_voice = "en_GB-alan-medium"
+
+# VAD and Silence detection
+silence_threshold_seconds = 1.3
+initial_listen_timeout = 10.0
+followup_listen_timeout = 8.0
+max_recording_seconds = 25.0
