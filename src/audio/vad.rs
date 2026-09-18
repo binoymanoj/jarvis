@@ -23,13 +23,24 @@ impl SileroVAD {
         let path = model_path.unwrap_or(&default_path);
 
         let session = if path.exists() {
-            match Session::builder().and_then(|mut b| b.commit_from_file(path)) {
-                Ok(s) => {
+            let res = (|| -> Option<Session> {
+                let mut b = Session::builder().ok()?;
+                b = b.with_intra_threads(1).ok()?;
+                b = b.with_inter_threads(1).ok()?;
+                b = b.with_memory_pattern(false).ok()?;
+                b = b.with_intra_op_spinning(false).ok()?;
+                b = b.with_inter_op_spinning(false).ok()?;
+                b = b.with_parallel_execution(false).ok()?;
+                b = b.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1).ok()?;
+                b.commit_from_file(path).ok()
+            })();
+            match res {
+                Some(s) => {
                     debug!("Silero VAD initialized successfully from {:?}", path);
                     Some(s)
                 }
-                Err(e) => {
-                    warn!("Failed to load Silero VAD model ({e}), using energy-based VAD fallback");
+                None => {
+                    warn!("Failed to load Silero VAD model, using energy-based VAD fallback");
                     None
                 }
             }

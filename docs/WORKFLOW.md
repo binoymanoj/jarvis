@@ -128,7 +128,7 @@ jarvis -c "schedule team sync for tomorrow at 4pm" --no-speech
 Jarvis interfaces directly with the native **`omarchy-reminder`** system and user systemd timers.
 
 ### Features
-* **Zero Background Overhead**: Uses systemd user timer units rather than sleeping Python threads.
+* **Zero Background Overhead**: Uses systemd user timer units rather than sleeping background threads.
 * **Desktop Notifications**: Triggers native desktop notifications with sound and visual badges when the countdown completes.
 * **Status Bar Integration**: Displays active countdowns in the Omarchy top bar tray indicator.
 

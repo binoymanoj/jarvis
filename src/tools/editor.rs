@@ -170,7 +170,7 @@ impl OpenFileInEditorTool {
                 cmd.stdout(Stdio::null()).stderr(Stdio::null());
                 cmd.spawn().map_err(|e| JarvisError::Other(format!("Failed to spawn {editor_cmd}: {e}")))?;
             }
-            "nvim" | "neovim" | "helix" | "hx" | "nano" | "vim" | _ => {
+            _ => {
                 let bin = match editor_cmd.as_str() {
                     "neovim" => "nvim",
                     "helix" => "hx",

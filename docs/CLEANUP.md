@@ -1,6 +1,6 @@
 # Omarchy Jarvis: Complete System Audit & Uninstallation Guide
 
-This document details **every single file, configuration change, binary, cache, and dependency** added to this system during the development and setup of **Jarvis**, followed by a step-by-step process and an automated one-line script to completely remove Jarvis from your machine.
+This document details **every single file, configuration change, binary, cache, and dependency** associated with **Jarvis** (100% Native Rust Architecture v0.2.0), followed by a step-by-step process and an automated script to completely uninstall Jarvis from your machine.
 
 ---
 
@@ -11,14 +11,13 @@ This document details **every single file, configuration change, binary, cache, 
 * No `pacman -S` or `yay -S` commands were executed with root/sudo. No system-wide system libraries were polluted.
 
 ### B. Systemd Services
-* **`~/.config/systemd/user/jarvis.service`**: The user systemd unit managing the background wake word listener daemon.
+* **`~/.config/systemd/user/jarvis.service`**: The user systemd unit managing the background wake word listener daemon (`jarvis --daemon`).
   - Stopped via: `systemctl --user stop jarvis`
   - Disabled via: `systemctl --user disable jarvis`
 
-### C. Executables & Binary Wrappers
-1. **`~/.local/bin/jarvis`**: The global executable shell wrapper that dispatches hotkey and CLI commands into the project virtual environment.
-2. **`~/.local/bin/uv` & `~/.local/bin/uvx`** *(optional)*: The standalone `uv` package and tool runner installed during environment bootstrap.
-3. **`~/.local/bin/env` & `~/.local/bin/env.fish`** *(optional)*: Created by the `uv` installer to export PATH.
+### C. Executables & Compiled Binaries
+1. **`~/.local/bin/jarvis`**: The compiled native Rust binary installed from `target/release/jarvis`.
+   - 100% Rust executable (linked with `mimalloc`, `ort` ONNX Runtime, and `cpal`).
 
 ### D. Configuration & Plugin Files Modified
 1. **`~/.config/hypr/bindings.lua`**:
@@ -32,56 +31,51 @@ This document details **every single file, configuration change, binary, cache, 
 2. **`~/.config/omarchy/plugins/top-bar/jarvis.qml`**:
    The native Omarchy top bar widget plugin providing the menu bar icon, active mic indicator dot, and popover control panel.
 3. **`/run/user/1000/jarvis-status.json`**:
-   Real-time status file shared between the Jarvis daemon and the Omarchy menu bar plugin.
-4. **`~/.config/mise/config.toml`** *(optional)*:
-   Line added under `[tools]`:
-   ```toml
-   uv = "latest"
-   ```
-5. **`~/.config/fish/conf.d/uv.env.fish`** *(optional)*: Added by `uv` installer.
-6. **`~/.config/uv/uv-receipt.json`** *(optional)*: Metadata from `uv` installer.
+   Real-time status file shared between the Jarvis Rust daemon and the Omarchy menu bar plugin.
+4. **`~/.config/jarvis/config.toml`**:
+   Optional user configuration file overriding default settings.
 
-
-### E. Project Directory & Local Python Environment
+### E. Project Directory & Rust Workspace
 * **`/home/binoy/Codes/personal/jarvis`**:
-  - `src/jarvis/`: Core code (agent, tools, UI QML, audio pipelines).
-  - `src/jarvis/audio/models/`: Downloaded local ONNX models:
-    - `silero_vad.onnx` (~2.3 MB)
-    - `en_GB-alan-medium.onnx` (~61 MB)
-    - `en_GB-alan-medium.onnx.json`
-  - `.venv/`: The project-isolated Python 3.14 virtual environment (all Python wheels: `google-genai`, `groq`, `sounddevice`, `numpy`, `piper-tts`, `onnxruntime`, etc.).
+  - `src/`: 100% Native Rust source code (audio capture, wake word, VAD, Gemini AI agent, 51 desktop tools, CLI, HUD IPC).
+  - `models/`: Local ONNX models:
+    - `hey_jarvis_v0.1.onnx` (~1.3 MB)
+    - `melspectrogram.onnx` (~1.1 MB)
+    - `embedding_model.onnx` (~1.3 MB)
+    - `silero_vad.onnx` (~1.8 MB)
+    - `en_GB-alan-medium.onnx` (~61 MB) + `.json`
+  - `Cargo.toml` & `Cargo.lock`: Rust manifest and locked dependency graph.
+  - `target/`: Rust build artifacts (`cargo clean` deletes this directory).
   - `.env`: Secret API keys (`GEMINI_API_KEY`, `GROQ_API_KEY`).
-  - `.git/`: Git repository metadata.
-  - `docs/`, `tests/`, `pyproject.toml`, `uv.lock`.
 
 ### F. Runtime Transient Files & Caches
 * **`/tmp/jarvis-1000.pid`**: Process ID lockfile for instance management and kill switch.
-* **`/tmp/jarvis-1000.state`**: Transient state indicator (`recording`, `processing`, `speaking`).
-* **`~/.cache/uv/`**: Cached Python wheels and source distributions.
+* **`/run/user/1000/jarvis-status.json`**: Transient state indicator (`standby`, `listening`, `processing`, `speaking`).
 
 ---
 
 ## 2. Step-by-Step Manual Uninstallation Process
 
-If you prefer to remove everything step-by-step by hand:
-
 ### Step 1: Kill any running Jarvis or Quickshell HUD instances
 ```bash
+# Stop and disable systemd user daemon
+systemctl --user stop jarvis 2>/dev/null || true
+systemctl --user disable jarvis 2>/dev/null || true
+
 # Terminate any running jarvis process
 pkill -f "jarvis" 2>/dev/null || true
 
-# Terminate any orphaned Quickshell HUD instances running the jarvis UI
+# Terminate any Quickshell HUD instances running the jarvis UI
 pkill -f "quickshell.*jarvis" 2>/dev/null || true
 
 # Remove runtime lock files
-rm -f /tmp/jarvis-*.pid /tmp/jarvis-*.state
+rm -f /tmp/jarvis-*.pid /run/user/1000/jarvis-*.json
 ```
 
 ### Step 2: Remove Hyprland Keybindings
 Open `~/.config/hypr/bindings.lua` in your editor and remove the Jarvis binding block:
 ```lua
--- Remove these 4 lines:
--- Jarvis Voice Assistant (Push-to-Talk Hold / Toggle & Emergency Kill)
+-- Remove these lines:
 o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Hold/Toggle)", "/home/binoy/.local/bin/jarvis -t")
 o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Release)", "/home/binoy/.local/bin/jarvis -s", { release = true })
 o.bind("SUPER + ALT + ESCAPE", "Kill Jarvis Assistant", "/home/binoy/.local/bin/jarvis -k")
@@ -91,52 +85,42 @@ Reload Hyprland so the shortcut is freed immediately:
 hyprctl reload
 ```
 
-### Step 3: Remove the Executable Wrapper
+### Step 3: Remove the Native Executable and Systemd Service
 ```bash
 rm -f ~/.local/bin/jarvis
+rm -f ~/.config/systemd/user/jarvis.service
+systemctl --user daemon-reload
 ```
 
-### Step 4: Delete the Jarvis Project Repository & Virtual Environment
+### Step 4: Remove Menu Bar Plugin (Optional)
+```bash
+rm -rf ~/.config/omarchy/plugins/top-bar/jarvis.qml
+```
+
+### Step 5: Delete the Jarvis Project Repository & Build Target
 ```bash
 rm -rf /home/binoy/Codes/personal/jarvis
 ```
 
 ---
 
-## 3. (Optional) Remove `uv` Package Manager
-
-If you only installed `uv` for Jarvis and do not use it for any other Python projects:
-
-### Step 1: Remove `uv` from `mise`
-```bash
-mise uninstall uv 2>/dev/null || true
-```
-And remove `uv = "latest"` from `~/.config/mise/config.toml`.
-
-### Step 2: Remove `uv` binaries and configurations
-```bash
-rm -f ~/.local/bin/uv ~/.local/bin/uvx ~/.local/bin/env ~/.local/bin/env.fish
-rm -rf ~/.config/uv ~/.config/fish/conf.d/uv.env.fish
-rm -rf ~/.cache/uv
-```
-
----
-
-## 4. Complete One-Shot Automated Removal Script
-
-To completely clean up Jarvis in 3 seconds, run this script:
+## 3. Complete One-Shot Automated Removal Script
 
 ```bash
 #!/usr/bin/env bash
 set -e
 
-echo "==> Stopping any active Jarvis sessions..."
+echo "==> Stopping systemd daemon and active Jarvis sessions..."
+systemctl --user stop jarvis 2>/dev/null || true
+systemctl --user disable jarvis 2>/dev/null || true
 pkill -f "jarvis" 2>/dev/null || true
 pkill -f "quickshell.*jarvis" 2>/dev/null || true
-rm -f /tmp/jarvis-*.pid /tmp/jarvis-*.state
+rm -f /tmp/jarvis-*.pid /run/user/1000/jarvis-*.json
 
-echo "==> Removing global binary wrapper..."
+echo "==> Removing native compiled binary and service..."
 rm -f "$HOME/.local/bin/jarvis"
+rm -f "$HOME/.config/systemd/user/jarvis.service"
+systemctl --user daemon-reload 2>/dev/null || true
 
 echo "==> Removing Hyprland keybindings..."
 if [ -f "$HOME/.config/hypr/bindings.lua" ]; then
@@ -144,20 +128,15 @@ if [ -f "$HOME/.config/hypr/bindings.lua" ]; then
     hyprctl reload 2>/dev/null || true
 fi
 
-echo "==> Deleting repository and virtual environment..."
+echo "==> Deleting repository..."
 rm -rf "$HOME/Codes/personal/jarvis"
 
-echo "==> Cleaning cache..."
-rm -rf "$HOME/.cache/uv"
-
-echo "✔ Jarvis has been completely removed from your system."
+echo "✔ Jarvis (Rust Native) has been completely removed from your system."
 ```
 
 ---
 
-## 5. Verification Checklist
-
-To confirm that your PC is 100% clean of Jarvis:
+## 4. Verification Checklist
 
 1. **Check process list**:
    ```bash

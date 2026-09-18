@@ -38,12 +38,15 @@ impl AudioCapture {
             .default_input_device()
             .ok_or_else(|| JarvisError::Audio("No default audio input device found.".into()))?;
 
-        let device_name = device.name().unwrap_or_else(|_| "Unknown Device".into());
+        let device_name = device
+            .description()
+            .map(|d| d.name().to_string())
+            .unwrap_or_else(|_| device.to_string());
         debug!("Using audio input device: {device_name}");
 
         let config = StreamConfig {
             channels: self.channels,
-            sample_rate: cpal::SampleRate(self.sample_rate),
+            sample_rate: self.sample_rate,
             buffer_size: cpal::BufferSize::Fixed(chunk_size as u32),
         };
 
@@ -54,7 +57,7 @@ impl AudioCapture {
         let tx_clone = tx.clone();
         let stream = device
             .build_input_stream(
-                &config,
+                config,
                 move |data: &[i16], _: &cpal::InputCallbackInfo| {
                     let _ = tx_clone.try_send(data.to_vec());
                 },
@@ -65,7 +68,7 @@ impl AudioCapture {
                 // Fallback to float32 input format if int16 is not supported natively by the hardware
                 let tx_f32 = tx.clone();
                 device.build_input_stream(
-                    &config,
+                    config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         let i16_data: Vec<i16> = data
                             .iter()

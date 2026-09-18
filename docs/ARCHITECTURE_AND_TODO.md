@@ -1,29 +1,31 @@
-# Omarchy Jarvis: Architecture, Free-Tier Strategy & Living Roadmap
+# Omarchy Jarvis: Master Architecture, Free-Tier Strategy & Living Roadmap
 
-> **Project Target**: AI Desktop Assistant ("Jarvis") natively integrated with Omarchy Linux & Hyprland.  
+> **Project Target**: AI Desktop Voice Assistant ("Jarvis") natively integrated with Omarchy Linux & Hyprland.  
 > **Host Environment**: Omarchy Linux (Arch Linux base, Hyprland 0.56+, Quickshell 0.3.1, PipeWire, Intel Core i7-1185G7, 31 GB RAM).  
-> **Core Language**: **Python 3.14+** (managed via `uv`)  
+> **Core Language**: **100% Native Rust** (`jarvis v0.2.0`) with Tokio Async Runtime, CPAL, and `mimalloc`.  
 > **Activation**: **Continuous Offline Wake Word ("Hey Jarvis")** + **Push-to-Talk Hotkey (`SUPER + SHIFT + ENTER`)**.  
 > **Emergency Kill Switch**: **`SUPER + ALT + ESCAPE`**  
 > **Full Performance & Specs Reference**: See [docs/PERFORMANCE_AND_SPECS.md](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)  
-> **Document Status**: Living roadmap and master architectural blueprint.
+> **Document Status**: Master architectural blueprint and living engineering roadmap.
 
+```
 󰚩 Omarchy Jarvis v0.2.0 (100% Rust Native)
-  Architecture:     x86_64-unknown-linux-gnu
-  AI Provider:      gemini
-  Reasoning Model:  gemini-3.5-flash-lite
-  Wake Word:        'jarvis' (threshold: 0.22)
+  Architecture:      x86_64-unknown-linux-gnu
+  Memory Allocator:  mimalloc (Drop-in high performance allocator)
+  AI Provider:       gemini (Google AI Studio)
+  Reasoning Model:   gemini-3.5-flash-lite (with 5-tier multi-model fallback)
+  Wake Word:         openWakeWord ONNX ('hey_jarvis_v0.1.onnx', threshold: 0.22)
   Editor / Terminal: nvim via kitty
-  STT Engine:       groq (whisper-large-v3-turbo)
-  TTS Engine:       edge (en-GB-RyanNeural)
-  Active API Key:   Configured
-  Groq Whisper Key: Configured
-  Background Daemon: Active
-
+  STT Engine:        groq (whisper-large-v3-turbo)
+  TTS Engine:        edge (en-GB-RyanNeural) / local piper-tts
+  Active API Key:    Configured
+  Groq Whisper Key:  Configured
+  Background Daemon: Active (systemd user unit `jarvis.service`)
+```
 
 ---
 
-## 1. Project Overview & Finalized Design Decisions
+## 1. Project Overview & Native Rust Architecture
 
 ```
                            ┌─────────────────────────────────────────────────────────┐
@@ -32,13 +34,13 @@
                                                         │
                                                         ▼
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                           JARVIS RUNTIME DAEMON (Python)                                         │
+│                                       JARVIS RUNTIME DAEMON (100% Pure Rust)                                     │
 │                                                                                                                  │
 │  ┌───────────────────────────────┐     ┌────────────────────────────────┐     ┌───────────────────────────────┐  │
 │  │     AUDIO INPUT & VAD         │     │     FREE-TIER LLM & AGENT      │     │      SPEECH SYNTHESIS         │  │
-│  │ • PipeWire (sounddevice)      │────▶│ • Google AI Studio (Gemini)    │────▶│ • piper-tts (local, <50ms)    │  │
-│  │ • Silero VAD (end-of-speech)  │     │ • GroqCloud (Llama 3.3 70B)    │     │ • or edge-tts (neural cloud)  │  │
-│  │ • Groq Whisper / Local int8   │     │ • Native Tool / Function Calls │     │ • Direct PipeWire playback    │  │
+│  │ • PipeWire (cpal 0.18)        │────▶│ • Google Gemini (reqwest 0.13) │────▶│ • msedge-tts (neural stream)  │  │
+│  │ • openWakeWord ONNX (ort 2.0) │     │ • GroqCloud (Whisper & Llama)  │     │ • piper-tts (local fallback)  │  │
+│  │ • Silero VAD (ort 2.0)        │     │ • Native Tool Registry (51)    │     │ • Direct PipeWire / pw-play   │  │
 │  └───────────────────────────────┘     └───────────────┬────────────────┘     └───────────────────────────────┘  │
 │                                                        │                                                         │
 │                                                        ▼                                                         │
@@ -50,15 +52,15 @@
 │                                        │ • Screen Capture (`grim`)      │                                        │
 │                                        └────────────────────────────────┘                                        │
 └───────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────┘
-                                                        │ IPC State Stream (LISTENING / THINKING / SPEAKING)
+                                                        │ IPC State Stream (/run/user/1000/jarvis-status.json)
                                                         ▼
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 FLOATING WAYLAND HUD (Siri-like Animated Orb)                                    │
-│  • Located at bottom-center of screen                                                                            │
-│  • Smooth fluid multi-color pulsing orb reacting to microphone level                                             │
-│  • Rotates/swirls during LLM reasoning ("Thinking")                                                             │
-│  • Resonates smoothly during speech playback                                                                     │
-│  • Automatically slides down / fades out when idle                                                               │
+│                                 FLOATING WAYLAND HUD (Quickshell QML Wave HUD)                                   │
+│  • Located at bottom-center of screen via Wayland layer-shell                                                    │
+│  • 15-bar symmetrical glowing gradient waveform reacting in real time to microphone volume                       │
+│  • Rotates & pulses during LLM reasoning ("Thinking...")                                                         │
+│  • Resonates smoothly during speech playback ("Speaking...")                                                     │
+│  • Automatically collapses and fades out when idle                                                               │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,120 +68,69 @@
 
 ## 2. Free-Tier API Strategy (Zero Cloud Cost)
 
-Since the Antigravity Pro subscription provides model access strictly inside the Antigravity developer environment and does not provide an external standalone API key for Python scripts, we utilize the **best free-tier providers**:
-
 | Role | Recommended Provider | Free Tier Allowance | Latency | Why it was chosen |
 | :--- | :--- | :--- | :--- | :--- |
-| **Reasoning & Tool Execution** | **Google AI Studio** (`Gemini 2.5 Flash` or `2.0 Flash`) | **15 RPM**, 1,000,000 TPM, **1,500 Requests/Day** for free | ~400–700 ms | Massive context window, native function calling, multimodal vision for screen diagnostics, zero credit card required at `aistudio.google.com`. |
-| **Fast Reasoning Fallback** | **GroqCloud** (`Llama 3.3 70B Versatile`) | **30 RPM**, 6,000 TPM, 1,000 RPD free | ~150–250 ms (~300 t/s) | Fastest LLM inference available. Instantaneous response for quick commands. |
-| **Speech-to-Text (STT)** | **Groq Audio API** (`Whisper Large v3`) | **20 RPM**, 2,000 audio seconds/min free | **~100–180 ms** | Transcribes full voice prompts 5x faster than real-time. |
-| **STT (Offline Fallback)** | **`faster-whisper`** (Local CPU) | Unlimited / 100% offline | ~250–350 ms on i7-1185G7 | Zero cloud dependency; uses `base.en` or `small.en` with int8 quantization. |
-| **Text-to-Speech (TTS)** | **`piper-tts`** (Local CPU) | Unlimited / 100% offline | **< 50 ms** first chunk | High quality British (`en_GB-alan-medium`) or American voices, instant playback without cloud delays. |
-| **TTS (Online Alternative)** | **`edge-tts`** (Microsoft Edge neural) | Unlimited free | ~200 ms | Extremely natural voices without API keys. |
+| **Reasoning & Tool Execution** | **Google AI Studio** (`gemini-3.5-flash-lite`, `gemini-2.5-flash`) | **15 RPM**, 1,000,000 TPM, **1,500 Requests/Day** free | ~400–700 ms | Massive context window, native parallel function calling, multimodal vision for screen diagnostics, zero credit card required. |
+| **Fast Reasoning Fallback** | **GroqCloud** (`llama-3.3-70b-versatile`) | **30 RPM**, 6,000 TPM, 1,000 RPD free | ~150–250 ms (~300 t/s) | Ultra-fast LLM inference; instant response for simple commands. |
+| **Speech-to-Text (STT)** | **Groq Audio API** (`whisper-large-v3-turbo`) | **20 RPM**, 2,000 audio seconds/min free | **~100–180 ms** | Transcribes full voice prompts 5x faster than real-time with zero local CPU load. |
+| **Wake Word Engine** | **openWakeWord ONNX** (`hey_jarvis_v0.1.onnx`) | Unlimited / 100% offline local CPU | **~25 ms** | Sub-1% CPU usage via single-threaded, no-spinning ONNX Runtime (`ort`). |
+| **Voice Activity Detection** | **Silero VAD ONNX** (`silero_vad.onnx`) | Unlimited / 100% offline local CPU | **~3 ms** | Detects human speech and silence pauses (0.85s cutoff) with zero cloud dependency. |
+| **Text-to-Speech (TTS)** | **Microsoft Edge TTS** (`en-GB-RyanNeural`) | Unlimited free | **~180–220 ms** | Natural neural British voice synthesis over streaming HTTP. |
+| **TTS (Local Offline Fallback)**| **`piper-tts`** (`en_GB-alan-medium.onnx`) | Unlimited / 100% offline | **< 50 ms** first chunk | High quality local voice synthesis directly to `pw-play`. |
 
 ---
 
-## 3. Python Package Manager Evaluation
+## 3. Rust Engine & Systems Architecture
 
-| Package Manager | Installation / Speed | Lockfile & Standards | System Integration (Arch/Omarchy) | Merits | Demerits |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`uv`** ⭐ *(Recommended)* | Written in Rust. **10x–100x faster** than pip. | Native `uv.lock` + standard `pyproject.toml`. | Available in `extra/uv` via pacman or `mise use -g uv`. | • Single binary replaces `pip`, `pip-tools`, `venv`, `poetry`, and `pyenv`.<br>• Fully respects Arch PEP 668.<br>• Instant environment creation (<50ms). | Newer tool (rapidly becoming industry standard). |
-| **`poetry`** | Python-based. Slower dependency solver. | `poetry.lock` + `pyproject.toml`. | Needs separate install (`pipx install poetry`). | Mature, rich plugin ecosystem. | Noticeably slow dependency resolution, heavy footprint. |
-| **Standard `venv` + `pip`** | Built into Python stdlib. | Requires manual `pip-compile` for lockfiles. | Built-in (`python -m venv .venv`). | Zero external tools required; universal. | Manual virtualenv activation required; pip installs are slow; no unified lockfile. |
-| **`pixi` / `conda`** | Fast (pixi is Rust-based). | Binary environment lockfile. | Installs non-Python libraries. | Excellent for complex C/CUDA builds. | Overkill for this project; non-standard Python environment. |
+### 3.1 Core Components
+* **Asynchronous Runtime**: [`tokio`](https://tokio.rs) v1.53 with multi-thread worker pool limited to 2 worker threads, conserving thread stacks and kernel contexts.
+* **Global Memory Allocator**: [`mimalloc`](https://github.com/purpleprotocol/mimalloc_rust) v0.1.52, eliminating glibc multi-arena fragmentation and returning memory pages aggressively to Linux.
+* **Audio Capture**: [`cpal`](https://crates.io/crates/cpal) v0.18 collecting 16 kHz 16-bit mono PCM chunks from PipeWire.
+* **ONNX Runtime**: [`ort`](https://ort.pyke.io) v2.0.0-rc.13 with global thread pool configuration (`with_spin_control(false)`, `with_intra_threads(1)`, `with_inter_threads(1)`), eliminating CPU busy-waiting.
+* **HTTP Client**: [`reqwest`](https://crates.io/crates/reqwest) v0.13 with native TLS and connection pooling.
+* **Hyprland IPC**: Native async UNIX domain socket client (`tokio::net::UnixStream`) querying `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`.
 
 ---
 
-## 4. Keybinding & Floating Animated Wave HUD Architecture
+## 4. Keybinding & Floating Wave HUD Architecture
 
 ### 4.1 Activation Flow
-1. User presses **`SUPER + SHIFT + ENTER`** anywhere in Hyprland.
-2. The keybind invokes `/home/binoy/.local/bin/jarvis -t`.
+1. User presses **`SUPER + SHIFT + ENTER`** anywhere in Hyprland or speaks **"Hey Jarvis"**.
+2. Keybind calls `jarvis -t` (toggles PTT listening mode).
 3. **Floating Transparent Animated Wave HUD appears** at the bottom-center of the screen:
-   - Microphone streams to memory buffer via non-blocking PipeWire.
+   - Microphone streams to memory buffer via non-blocking PipeWire CPAL stream.
    - Symmetrical 15-bar electric waveform ripples and scales in real-time to microphone volume.
 4. User speaks their command:
-   - **Silero VAD** cuts off after **0.55s** of silence (optimized for instant response).
-5. HUD transitions to **"Thinking" state** (traveling scanning wave across the bars).
-6. Jarvis dispatches tool call or response via Gemini 2.5 Flash (`thinking_budget=0` for ~1.0s turnaround):
-   - Fast Groq Whisper transcription (`whisper-large-v3-turbo`).
-   - Native Hyprland Lua dispatch (`hl.dsp.focus({ workspace = "..." })`).
-7. HUD pulses smoothly in **"Speaking" state** while `piper-tts` plays audio.
-8. HUD smoothly collapses and fades out when done.
-
-### 4.2 HUD Visual Design (Transparent Fluid Waves)
-- **Zero background container**: No rectangular cards, no borders, no frosted boxes; 100% transparent layer-shell.
-- **Wave Spectrum**: 15 vertical rounded gradient bars (`#38bdf8` cyan to `#c084fc` purple) with Gaussian bell envelope.
-- **Centered Text**: Typography positioned directly below the waves with subtle outline shadow for legibility across any wallpaper.
-
-### 4.2 HUD Implementation Options
-
-| Approach | Technology | Pros | Cons |
-| :--- | :--- | :--- | :--- |
-| **Option A: Quickshell QML** ⭐ *(Recommended)* | Native Wayland layer-shell via `quickshell` (already installed on Omarchy) | • Native to Omarchy design system.<br>• True Wayland layer-shell: anchored to bottom, transparent, zero window frame.<br>• GPU-accelerated fluid particle/wave shaders at 60fps. | Requires QML script communicating with Python daemon via socket/IPC. |
-| **Option B: PySide6 / Qt6 Window** | Python Qt6 with QPainter / QML | • Single codebase in Python.<br>• Rich graphics capabilities. | Requires Hyprland floating window rules (`float`, `pin`, `noborder`) and extra process memory (~70MB). |
-| **Option C: Omarchy Notification Toast** | `omarchy-notification-send` | • Zero UI code needed.<br>• Fast and simple. | Not a Siri-like glowing orb; purely textual notifications. |
+   - **Silero VAD** cuts off after **0.85s** of silence.
+5. HUD transitions to **"Thinking..."** state (traveling scanning wave across the bars).
+6. Jarvis dispatches tool call or response via Gemini Flash Lite:
+   - High-speed Groq Whisper transcription (`whisper-large-v3-turbo`).
+   - Native Rust tool execution against Hyprland, applications, shell, or desktop.
+7. HUD pulses smoothly in **"Speaking..."** state while TTS plays audio.
+8. HUD smoothly collapses and fades out when complete.
 
 ---
 
-## 5. Master Roadmap & Living TODO List
+## 5. Master Roadmap & Completed Milestones
 
-### Phase 1: Environment & Architecture Setup
-- [x] **1.1 Package Manager Initialization**: Initialize project with `uv` (`pyproject.toml`, virtual environment `.venv`).
-- [x] **1.2 Free API Key Configuration**: Create `.env` template and loader for `GEMINI_API_KEY` and `GROQ_API_KEY`.
-- [x] **1.3 Project Directory Structure**: Establish `src/audio`, `src/core`, `src/tools`, `src/ui`, and `tests`.
-- [x] **1.4 Logging & Config Manager**: Set up structured logging with clean Omarchy-friendly console output.
+### Phase 1: Native Rust Audio Engine & Wake Word ✅
+- [x] **CPAL PipeWire Capture**: 16,000 Hz, 1 channel, 16-bit PCM streaming.
+- [x] **Native ONNX Inference**: Single-threaded `ort` running `melspectrogram.onnx`, `embedding_model.onnx`, and `hey_jarvis_v0.1.onnx`.
+- [x] **Silero VAD v4**: Integrated offline voice activity detection for natural conversational turn completion.
+- [x] **Wake Chime**: Instant procedural WAV chime generation and playback.
 
-### Phase 2: Hyprland & Omarchy IPC Handlers
-- [x] **2.1 Direct Hyprland Command Socket**: Async client for `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock`.
-- [x] **2.2 Hyprland State Querying**: High-speed JSON fetching for `activewindow`, `workspaces`, and `clients`.
-- [x] **2.3 Hyprland Event Stream Listener**: Background async listener for `.socket2.sock` (tracking workspace & active window changes).
-- [x] **2.4 Omarchy Command Bridge**: Wrapper to execute any of Omarchy's 350+ CLI commands (`omarchy audio`, `omarchy theme`, `omarchy brightness`, etc.).
-- [x] **2.5 Screen Perception Tool**: Crop & capture active window or full screen via `grim` + `hyprctl activewindow -j`.
+### Phase 2: Hyprland & Omarchy IPC Handlers ✅
+- [x] **Direct Hyprland Command Socket**: Async client for `.socket.sock`.
+- [x] **Hyprland Event Stream Listener**: Async event consumer for `.socket2.sock`.
+- [x] **Omarchy Command Bridge**: Wrapper to execute Omarchy CLI commands and menu bar integration.
+- [x] **Screen Perception Tool**: Crop & capture active window or full screen via `grim` and multimodal vision.
 
-### Phase 3: Push-to-Talk Audio & Speech Pipeline
-- [x] **3.1 Audio Capture via PipeWire**: Non-blocking audio capture using `sounddevice` / `numpy`.
-- [x] **3.2 Voice Activity Detection (VAD)**: Lightweight Silero VAD (ONNX) detecting end of speech in <1ms without PyTorch/CUDA bloat.
-- [x] **3.3 Cloud STT (Groq Whisper)**: Ultra-fast cloud transcription client (~100ms verified with live key).
-- [x] **3.4 Local STT Fallback (`faster-whisper`)**: Offline transcription on CPU if cloud is unavailable or disabled.
-- [x] **3.5 TTS Voice Output (`piper-tts` & `edge-tts`)**: Sub-50ms local speech generation with natural British Alan voice.
+### Phase 3: AI Agent & 51 Tool Palettes ✅
+- [x] **Multi-Model Fallback Pool**: 5-tier Gemini & Groq fallback matrix with automatic failover on 429 quota limits.
+- [x] **51 Native Desktop Tools**: Complete suite covering Hyprland workspace management, media (MPRIS), virtual typing (`wtype`), keyboard shortcuts, calendar scheduling, email composition, notes, autonomous CLI coding, shell execution, clipboard, and system power.
+- [x] **Quickshell QML Wave HUD**: Fluid 60fps GPU-accelerated layer-shell HUD.
 
-### Phase 4: Free-Tier LLM Agent & Function Calling
-- [x] **4.1 Gemini 2.5 Flash Agent**: Client using `google-genai` SDK with verified free Google AI Studio key.
-- [x] **4.2 Tool Schema Definitions**: Expose Hyprland and Omarchy capabilities as native threadsafe sync tools (`switch_workspace`, `focus_application`, `close_active_window`, `toggle_layout_split`, `toggle_fullscreen`, `adjust_volume`, `set_brightness`, `set_theme`, `get_battery`, `launch_application`, `inspect_screen`, `notify`).
-- [x] **4.3 Multimodal Screen Analysis**: Send screenshot + user voice query to Gemini Flash for instant UI error diagnosis.
-- [x] **4.4 Conversational Context Memory**: Maintain short-term conversational context and window focus state.
-
-### Phase 5: Floating Siri-like Animated HUD
-- [x] **5.1 HUD Architecture**: Standalone Quickshell QML overlay anchored at bottom-center with transparent background and zero window frame (`shell.qml`).
-- [x] **5.2 State Machine**: `IDLE` ➔ `LISTENING` (reactive multi-layer glowing orb scaling with audio RMS) ➔ `THINKING` (spinning gradient swirl) ➔ `SPEAKING` (harmonic wave pulses) ➔ `EXIT` (smooth fade-out).
-- [x] **5.3 IPC Channel**: Python controller (`hud.py`) drives states and throttles 20fps volume metering over Quickshell IPC.
-
-### Phase 6: Hotkey Integration & Systemd Service
-- [x] **6.1 Hyprland Keybinding**: Mapped `SUPER + SHIFT + RETURN` in `~/.config/hypr/bindings.lua` to `/home/binoy/.local/bin/jarvis -t` (reloaded and active in Hyprland).
-- [x] **6.2 CLI Entrypoint**: Complete support for interactive voice HUD mode (`jarvis -t`), headless text commands (`jarvis -c "..."`), and status diagnostics (`jarvis --status`).
-- [x] **6.3 System-Wide Availability**: Installed executable wrapper in `~/.local/bin/jarvis` accessible from any directory.
-
----
-
-## 6. Current Task Tracking Dashboard
-
-| Milestone / Task | Status | Target Completion | Notes |
-| :--- | :--- | :--- | :--- |
-| Architecture Document & Living Plan | **DONE** ✅ | Milestone 0 | Finalized in `docs/ARCHITECTURE_AND_TODO.md` |
-| Keybinding Reservation (`SUPER + SHIFT + ENTER`) | **DONE** ✅ | Milestone 0 | Confirmed and wired in `bindings.lua` |
-| Package Manager Choice (`uv`) | **DONE** ✅ | Milestone 0 | `uv 0.12.12` installed and verified |
-| STT Strategy Choice (Hybrid Groq + Faster-Whisper) | **DONE** ✅ | Milestone 0 | Ultra-low latency cloud + offline fallback |
-| UI Framework Choice (Quickshell QML) | **DONE** ✅ | Milestone 0 | Native Wayland layer-shell round orbit HUD |
-| Hotkey Interaction Choice (Push-to-Talk Hold / Toggle + Conversational VAD) | **DONE** ✅ | Milestone 0 | Hold key or tap once; release or ~700ms natural pause submits |
-| **Phase 1: Environment & Project Scaffolding** | **DONE** ✅ | Phase 1 | `pyproject.toml`, `.venv`, Pydantic config, Rich logger, CLI |
-| **Phase 2: Hyprland & Omarchy IPC Handlers** | **DONE** ✅ | Phase 2 | Lua dispatchers, sockets, events, Omarchy commands, screen capture |
-| **Free Tier API Key Setup (Gemini + Groq)** | **DONE** ✅ | Phase 3 | Both keys verified and configured in `.env` |
-| **Phase 3: Push-to-Talk Audio & Speech Pipeline** | **DONE** ✅ | Phase 3 | PipeWire capture, conversational ~700ms Silero VAD, Groq Whisper STT, Piper TTS |
-| **Phase 4: Free-Tier LLM Agent & Function Calling** | **DONE** ✅ | Phase 4 | Instant context snapshot, multi-model fallback pool (`gemini-flash-latest`, `gemini-3.5-flash`) with zero quota lockouts |
-| **Phase 5: Minimal Futuristic Horizontal HUD** | **DONE** ✅ | Phase 5 | 56px minimal AI orbit, unclipped left-to-right text, dynamic Omarchy theme sync, 100% transparent |
-| **Phase 6: Hotkey Integration & Kill Switch** | **DONE** ✅ | Phase 6 | `SUPER + SHIFT + ENTER` (Hold/Toggle PTT), `SUPER + ALT + ESCAPE` (Instant Kill Switch) |
-| **Phase 7: Hands-Free Operating Suite & Zero-Touch Tools** | **DONE** ✅ | Phase 7 | Wayland `wtype` typing/shortcuts, bash execution, MPRIS media control, clipboard, and system power |
-| **Phase 8: System Hardening & Performance Benchmarking** | **DONE** ✅ | Phase 8 | VAD room-noise lock eliminated, HUD IPC optimized, benchmarks & specs documented in `docs/PERFORMANCE_AND_SPECS.md` |
-
-
+### Phase 4: Systems Hardening & Memory Optimization ✅
+- [x] **Zero-Spinning ONNX**: Eliminated thread pool spin loops (`with_spin_control(false)` and `with_intra_op_spinning(false)`).
+- [x] **mimalloc Integration**: Reduced heap retention and eliminated glibc multi-arena memory growth.
+- [x] **Dependency Deduplication**: Unified reqwest, hyper, and TLS stacks to v0.13.

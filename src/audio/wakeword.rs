@@ -60,24 +60,36 @@ impl WakeWordDetector {
             models_dir.join(&ww_filename)
         };
 
+        let build_opt_session = |path: &std::path::Path| -> Option<Session> {
+            let mut b = Session::builder().ok()?;
+            b = b.with_intra_threads(1).ok()?;
+            b = b.with_inter_threads(1).ok()?;
+            b = b.with_memory_pattern(false).ok()?;
+            b = b.with_intra_op_spinning(false).ok()?;
+            b = b.with_inter_op_spinning(false).ok()?;
+            b = b.with_parallel_execution(false).ok()?;
+            b = b.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1).ok()?;
+            b.commit_from_file(path).ok()
+        };
+
         let melspec_session = if mel_path.exists() {
-            Session::builder().and_then(|mut b| b.commit_from_file(&mel_path)).ok()
+            build_opt_session(&mel_path)
         } else {
             None
         };
 
         let embedding_session = if emb_path.exists() {
-            Session::builder().and_then(|mut b| b.commit_from_file(&emb_path)).ok()
+            build_opt_session(&emb_path)
         } else {
             None
         };
 
         let wakeword_session = if ww_path.exists() {
-            Session::builder().and_then(|mut b| b.commit_from_file(&ww_path)).ok()
+            build_opt_session(&ww_path)
         } else {
             // Fall back to hey_jarvis_v0.1.onnx if custom model not found
             let fallback_ww = models_dir.join("hey_jarvis_v0.1.onnx");
-            Session::builder().and_then(|mut b| b.commit_from_file(&fallback_ww)).ok()
+            build_opt_session(&fallback_ww)
         };
 
         let display_name = if settings.wakeword_name.eq_ignore_ascii_case("jarvis") {

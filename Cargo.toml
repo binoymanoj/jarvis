@@ -7,44 +7,45 @@ description = "Jarvis - Ultra-low-latency, zero-cost AI desktop voice assistant 
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.43", features = ["full"] }
-async-trait = "0.1"
+tokio = { version = "1.53", features = ["full"] }
+async-trait = "0.1.92"
 
 # CLI Parsing
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 
 # Serialization & Config
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-toml = "0.8"
-dotenvy = "0.15"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+toml = "1.1"
+dotenvy = "0.15.7"
 
 # Error Handling & Logging
-thiserror = "2.0"
-anyhow = "1.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2.0.20"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # HTTP & Web
-reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
 
 # Utilities
-chrono = { version = "0.4", features = ["serde"] }
-regex = "1.11"
-urlencoding = "2.1"
-base64 = "0.22"
-which = "7.0"
-hound = "3.5"
-cpal = "0.15"
+chrono = { version = "0.4.45", features = ["serde"] }
+regex = "1.13"
+urlencoding = "2.1.3"
+base64 = "0.23"
+which = "8.0"
+hound = "3.5.1"
+cpal = "0.18"
 ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
-ndarray = "0.17"
-nix = { version = "0.29", features = ["signal", "process", "user"] }
-tempfile = "3.17"
+ndarray = "0.17.2"
+nix = { version = "0.31", features = ["signal", "process", "user"] }
+tempfile = "3.27"
 msedge-tts = { version = "0.4.0", default-features = false, features = ["tokio-runtime"] }
+mimalloc = { version = "0.1.52", default-features = false, features = ["no_thp"] }
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
