@@ -431,8 +431,19 @@ pub async fn request_confirmation(
     let _ = fs::remove_file(&result_file);
 
     // Locate jarvis binary
-    let jarvis_bin =
-        std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/home/binoy/.local/bin/jarvis"));
+    let jarvis_bin = std::env::current_exe().unwrap_or_else(|_| {
+        if let Ok(path) = which::which("jarvis") {
+            path
+        } else {
+            let home = std::env::var("HOME").unwrap_or_default();
+            let user_bin = PathBuf::from(&home).join(".local/bin/jarvis");
+            if user_bin.is_file() {
+                user_bin
+            } else {
+                PathBuf::from("jarvis")
+            }
+        }
+    });
 
     // 2. Launch floating terminal popup (kitty, foot, or xdg-terminal-exec)
     let kitty_bin = which::which("kitty").ok();

@@ -671,9 +671,10 @@ To keep your desktop distraction-free, notifications are **never** emitted for:
 ---
 
 ## 📄 Related Documentation
+* [Complete Setup & Configuration Guide](file:///home/binoy/Codes/personal/jarvis/docs/SETUP_GUIDE.md)
 * [Performance Benchmarks & Technical Specifications](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)
-* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [Multi-Workspace Workflows Guide](file:///home/binoy/Codes/personal/jarvis/docs/WORKFLOW.md)
+* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [System Audit & Complete Uninstallation Guide](file:///home/binoy/Codes/personal/jarvis/docs/CLEANUP.md)
 * [Architecture & Living Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)
 

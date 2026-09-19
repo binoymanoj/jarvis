@@ -19,18 +19,38 @@ impl JarvisHUD {
         let qs_bin = which::which("qs").unwrap_or_else(|_| PathBuf::from("/usr/bin/qs"));
         let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
 
+        let home_path = PathBuf::from(&home);
+
         let candidates = [
-            PathBuf::from("/home/binoy/Codes/personal/jarvis/ui"),
+            home_path.join(".config/jarvis/ui"),
+            home_path.join(".local/share/jarvis/ui"),
             PathBuf::from("./ui"),
-            PathBuf::from(&home).join(".config/jarvis/ui"),
             PathBuf::from("/usr/share/jarvis/ui"),
+            PathBuf::from("/usr/local/share/jarvis/ui"),
         ];
 
-        let ui_path = candidates
+        let mut ui_path = candidates
             .iter()
             .find(|p| p.join("shell.qml").is_file())
-            .cloned()
-            .unwrap_or_else(|| candidates[0].clone());
+            .cloned();
+
+        if ui_path.is_none() {
+            if let Ok(exe) = env::current_exe() {
+                if let Some(parent) = exe.parent() {
+                    let exe_ui = parent.join("ui");
+                    if exe_ui.join("shell.qml").is_file() {
+                        ui_path = Some(exe_ui);
+                    } else if let Some(grandparent) = parent.parent() {
+                        let share_ui = grandparent.join("share/jarvis/ui");
+                        if share_ui.join("shell.qml").is_file() {
+                            ui_path = Some(share_ui);
+                        }
+                    }
+                }
+            }
+        }
+
+        let ui_path = ui_path.unwrap_or_else(|| candidates[0].clone());
 
         Self {
             ui_path,

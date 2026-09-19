@@ -318,8 +318,18 @@ mod tests {
 
     #[test]
     fn test_find_project_dir_and_file() {
-        let tool =
-            OpenFileInEditorTool::new("nvim", "kitty", &["/home/binoy/Codes/personal".to_string()]);
+        let temp_dir = tempfile::tempdir().expect("Failed to create tempdir");
+        let proj_dir = temp_dir.path().join("tracky-researcher-tui");
+        let nested_dir = proj_dir.join("internal").join("models");
+        std::fs::create_dir_all(&nested_dir).expect("Failed to create nested test dirs");
+        let model_file = nested_dir.join("models.go");
+        std::fs::write(&model_file, "package models").expect("Failed to write test file");
+
+        let tool = OpenFileInEditorTool::new(
+            "nvim",
+            "kitty",
+            &[temp_dir.path().to_string_lossy().to_string()],
+        );
         let proj = tool.find_project_dir("tracky researcher tui");
         assert!(
             proj.is_some(),
@@ -333,7 +343,7 @@ mod tests {
             file.is_some(),
             "Should find models.go recursively inside project"
         );
-        let file_path = file.unwrap();
-        assert!(file_path.ends_with("internal/models/models.go"));
+        let found_path = file.unwrap();
+        assert!(found_path.ends_with("internal/models/models.go"));
     }
 }

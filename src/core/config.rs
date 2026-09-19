@@ -317,7 +317,6 @@ impl Settings {
         let toml_candidates = [
             primary_toml_path.clone(),
             PathBuf::from("config.toml"),
-            PathBuf::from("/home/binoy/Codes/personal/jarvis/config.toml"),
         ];
 
         let mut toml_config = TomlConfig::default();
@@ -350,7 +349,6 @@ impl Settings {
         let env_candidates = [
             PathBuf::from(".env"),
             PathBuf::from("../.env"),
-            PathBuf::from("/home/binoy/Codes/personal/jarvis/.env"),
             config_dir.join(".env"),
         ];
 

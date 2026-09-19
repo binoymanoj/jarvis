@@ -151,29 +151,75 @@ Jarvis will politely acknowledge and dismiss the HUD.
 
 ---
 
-## 🔧 Configuration (`.env`)
+## 🚀 Quick Start & Installation
 
-All core options can also be customized in `~/.config/jarvis/config.toml` (and `.env`, see [.env.example](file:///home/binoy/Codes/personal/jarvis/.env.example)):
+Getting Jarvis running on your system takes less than 3 minutes:
+
+```bash
+# 1. Clone & compile release binary
+git clone https://github.com/binoymanoj/jarvis.git && cd jarvis
+cargo build --release
+install -Dm755 target/release/jarvis ~/.local/bin/jarvis
+
+# 2. Copy bundled offline models and UI assets
+mkdir -p ~/.config/jarvis/models ~/.config/jarvis/ui
+cp -r models/* ~/.config/jarvis/models/
+cp -r ui/* ~/.config/jarvis/ui/
+
+# 3. Configure API keys in ~/.config/jarvis/config.toml
+cp config.toml ~/.config/jarvis/config.toml
+# Edit ~/.config/jarvis/config.toml to add your GEMINI_API_KEY and GROQ_API_KEY
+
+# 4. Start background wake word daemon
+jarvis -d
+```
+
+> 📖 **Looking for full step-by-step instructions?**  
+> Check out the in-depth **[Complete Setup & Configuration Guide](file:///home/binoy/Codes/personal/jarvis/docs/SETUP_GUIDE.md)** covering system dependencies, Hyprland keybindings, systemd service setup, top bar widget, and troubleshooting.
+
+---
+
+## 🔧 Configuration (`config.toml` & `.env`)
+
+Jarvis is configured via `~/.config/jarvis/config.toml` (auto-created on first run if missing). You can also provide environment variables or define them in `~/.config/jarvis/.env`:
 
 ```toml
 # ~/.config/jarvis/config.toml
-[core]
-model = "gemini-2.5-flash"
-wakeword_name = "jarvis" # Activated via "Hey Jarvis"
+[ai]
+provider = "gemini"               # "gemini", "openai", "anthropic", "groq", "openrouter"
+model = "gemini-3.5-flash-lite"   # Fast default reasoning model
+gemini_api_key = "AIzaSy..."      # Or set in ~/.config/jarvis/.env
+groq_api_key = "gsk_..."          # Ultra-fast STT
+cli_tool = "claude"               # Autonomous coding CLI: "claude", "codex", "agy"
+
+[wakeword]
+enabled = true                    # Continuous background wake word detection
+name = "hey jarvis"               # "hey jarvis", "alexa", "hey_mycroft", "hey_rhasspy"
+threshold = 0.50                  # Sensitivity threshold (0.30 - 0.70)
+
+[editor]
+default = "nvim"                  # "nvim", "code", "helix"
+terminal = "kitty"                # "kitty", "foot"
+project_dirs = ["~/Projects", "~/Codes", "~/src", "~"]
 
 [media]
 media_dirs = ["~/Videos", "~/Movies", "~/Downloads"]
 player = "mpv"
+
+[audio]
+stt_engine = "groq"
+whisper_model = "whisper-large-v3-turbo"
+tts_engine = "edge"               # "edge" (zero-latency neural) or "piper" (offline)
+edge_voice = "en-GB-RyanNeural"
 ```
 
 Key environment variables:
+* **`GEMINI_API_KEY`**: Google Gemini API key for reasoning, conversation, and screen vision.
+* **`GROQ_API_KEY`**: Groq API key for ultra-fast Whisper speech-to-text (~150ms).
 * **`JARVIS_CLI_AI_TOOL`**: Preferred autonomous CLI coding agent (`claude` [default], `agy`, or `codex`).
-* **`GEMINI_API_KEY`**: Google Gemini API key for fast reasoning and vision.
-* **`GROQ_API_KEY`**: Groq API key for ultra-fast Whisper speech-to-text.
-* **`JARVIS_TTS_ENGINE`**: TTS engine (`piper` for local neural synthesis, `edge` for cloud fallback).
+* **`JARVIS_TTS_ENGINE`**: TTS engine (`edge` for cloud neural synthesis, `piper` for local neural synthesis).
 * **`JARVIS_MEDIA_DIRS`**: Comma-delimited list of directories to scan for movies/series.
 * **`JARVIS_MEDIA_PLAYER`**: Default video player (`mpv`).
-* **`JARVIS_DEFAULT_WORKSPACE_ROOT`**: Default path for generated projects (`~/Codes/personal`).
 
 ---
 
@@ -241,9 +287,11 @@ systemctl --user status jarvis
 
 ## 📄 Documentation
 
+* [Complete Setup & Configuration Guide](file:///home/binoy/Codes/personal/jarvis/docs/SETUP_GUIDE.md)
 * [Performance Benchmarks & Technical Specifications](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)
-* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [Complete Capabilities & Feature Reference](file:///home/binoy/Codes/personal/jarvis/docs/CAPABILITIES.md)
 * [Multi-Workspace Workflows Guide](file:///home/binoy/Codes/personal/jarvis/docs/WORKFLOW.md)
+* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [System Audit & Complete Uninstallation Guide](file:///home/binoy/Codes/personal/jarvis/docs/CLEANUP.md)
 * [Architecture & Living Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)
+
