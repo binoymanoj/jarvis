@@ -28,18 +28,18 @@ pub struct WakeWordDetector {
 
 #[allow(clippy::excessive_precision)]
 const SILENCE_EMBEDDING: [f32; 96] = [
-    -4.936722, 19.387594, 8.662575, -3.079512, 4.874652, 25.96701, 10.267291, -15.02655,
-    -1.100898, 11.771112, -26.499851, -1.849956, 9.19239, -5.976384, -5.40081, -3.406047,
-    7.080233, -5.844443, 3.985872, -13.363791, 4.440428, 18.841412, -8.178735, -9.440122,
-    -7.618305, 13.860628, -20.480137, -2.998387, 4.332905, 2.646651, -10.251684, 18.191359,
-    -21.826748, -3.785842, -12.35635, -1.343246, 38.230148, 18.310574, -8.144447, 26.286665,
-    -9.480198, 2.89648, 37.794834, -16.301245, -13.528915, -7.998281, -8.230913, 6.217336,
-    15.473965, -7.471695, -9.008852, 3.090901, 11.819296, -1.033224, -20.816809, -17.792492,
-    -1.208664, 28.544418, -15.447296, 0.356498, 6.248527, 8.138709, 11.195825, -3.0412,
-    25.106758, 14.920961, 8.971652, -13.14422, -10.940308, 3.817143, 0.657487, 9.037533,
-    8.665456, -6.888185, 12.278726, 6.570675, 3.519481, 7.54345, -22.791733, -36.776505,
-    11.589973, 17.173134, 8.118751, -11.019923, 13.788208, -5.869898, 13.466286, -10.36521,
-    10.326647, 37.467678, 5.638528, 21.887428, 28.544918, -30.547234, 7.677816, 27.27882,
+    -4.936722, 19.387594, 8.662575, -3.079512, 4.874652, 25.96701, 10.267291, -15.02655, -1.100898,
+    11.771112, -26.499851, -1.849956, 9.19239, -5.976384, -5.40081, -3.406047, 7.080233, -5.844443,
+    3.985872, -13.363791, 4.440428, 18.841412, -8.178735, -9.440122, -7.618305, 13.860628,
+    -20.480137, -2.998387, 4.332905, 2.646651, -10.251684, 18.191359, -21.826748, -3.785842,
+    -12.35635, -1.343246, 38.230148, 18.310574, -8.144447, 26.286665, -9.480198, 2.89648,
+    37.794834, -16.301245, -13.528915, -7.998281, -8.230913, 6.217336, 15.473965, -7.471695,
+    -9.008852, 3.090901, 11.819296, -1.033224, -20.816809, -17.792492, -1.208664, 28.544418,
+    -15.447296, 0.356498, 6.248527, 8.138709, 11.195825, -3.0412, 25.106758, 14.920961, 8.971652,
+    -13.14422, -10.940308, 3.817143, 0.657487, 9.037533, 8.665456, -6.888185, 12.278726, 6.570675,
+    3.519481, 7.54345, -22.791733, -36.776505, 11.589973, 17.173134, 8.118751, -11.019923,
+    13.788208, -5.869898, 13.466286, -10.36521, 10.326647, 37.467678, 5.638528, 21.887428,
+    28.544918, -30.547234, 7.677816, 27.27882,
 ];
 
 impl WakeWordDetector {
@@ -68,7 +68,9 @@ impl WakeWordDetector {
             b = b.with_intra_op_spinning(false).ok()?;
             b = b.with_inter_op_spinning(false).ok()?;
             b = b.with_parallel_execution(false).ok()?;
-            b = b.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1).ok()?;
+            b = b
+                .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1)
+                .ok()?;
             b.commit_from_file(path).ok()
         };
 
@@ -92,8 +94,15 @@ impl WakeWordDetector {
             build_opt_session(&fallback_ww)
         };
 
-        let display_name = if settings.wakeword_name.eq_ignore_ascii_case("jarvis") {
-            "Jarvis / Hey Jarvis".to_string()
+        let display_name = if settings.wakeword_name.starts_with("hey ") {
+            let rest = settings.wakeword_name.trim_start_matches("hey ").trim();
+            if let Some(first) = rest.chars().next() {
+                format!("Hey {}{}", first.to_uppercase(), &rest[first.len_utf8()..])
+            } else {
+                "Hey Jarvis".to_string()
+            }
+        } else if settings.wakeword_name.eq_ignore_ascii_case("alexa") {
+            "Alexa".to_string()
         } else {
             settings.wakeword_name.clone()
         };
@@ -122,6 +131,10 @@ impl WakeWordDetector {
             melspec_buffer,
             feature_buffer,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn reset(&mut self) {
@@ -193,7 +206,8 @@ impl WakeWordDetector {
 
         // 1. Compute streaming melspectrogram (requires at least 1760 samples for openWakeWord STFT)
         let start_idx = self.raw_buffer.len() - 1760;
-        let float_audio: Vec<f32> = self.raw_buffer
+        let float_audio: Vec<f32> = self
+            .raw_buffer
             .range(start_idx..)
             .map(|&s| s as f32)
             .collect();
@@ -317,7 +331,10 @@ impl WakeWordDetector {
         F: FnMut() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = ()> + Send + 'static,
     {
-        info!("Starting background wake word listener ('{}')...", self.name);
+        info!(
+            "Starting background wake word listener ('{}')...",
+            self.name
+        );
         let capture = AudioCapture::new(16000, 1);
         let chunk_size = 1280; // 80ms at 16kHz
 
@@ -362,7 +379,8 @@ impl WakeWordDetector {
                     break;
                 }
 
-                let chunk = match tokio::time::timeout(Duration::from_millis(120), rx.recv()).await {
+                let chunk = match tokio::time::timeout(Duration::from_millis(120), rx.recv()).await
+                {
                     Ok(Some(c)) => c,
                     Ok(None) => break,
                     Err(_) => continue,
@@ -370,7 +388,10 @@ impl WakeWordDetector {
 
                 let (detected, score) = self.process_chunk(&chunk);
                 if detected {
-                    info!("󰚩 Wake word '{}' detected! (score: {:.2})", self.name, score);
+                    info!(
+                        "󰚩 Wake word '{}' detected! (score: {:.2})",
+                        self.name, score
+                    );
                     drop(_stream); // Release mic stream for conversational recording turn
                     sleep(Duration::from_millis(50)).await;
                     play_wake_chime().await;
