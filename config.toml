@@ -29,11 +29,11 @@ cli_tool = "claude"
 # Background wake word detection active in daemon
 enabled = true
 
-# Wake word name: "jarvis" / "hey jarvis" (default), "alexa", "hey_mycroft", "hey_rhasspy"
-name = "jarvis"
+# Wake word name: "hey jarvis" (default), "hey <name>", "alexa", "hey_mycroft", "hey_rhasspy"
+name = "hey jarvis"
 
-# Sensitivity threshold (0.15 - 0.50). Lower is more sensitive for quiet speech. Default: 0.22
-threshold = 0.22
+# Sensitivity threshold (0.30 - 0.70). Default: 0.50 (requires clear 'Hey Jarvis', preventing accidental triggers from 'Jarvis' or ambient speech)
+threshold = 0.50
 
 # Optional custom ONNX model path (relative to models dir or absolute)
 # model_path = "models/hey_jarvis_v0.1.onnx"
@@ -47,6 +47,14 @@ terminal = "kitty"
 
 # Project search directories (searched when asking e.g. "open models.go from tracky-researcher-tui")
 project_dirs = ["~/Codes/personal", "~/Codes", "~/Projects", "~"]
+
+[media]
+# Directories searched for movies, TV series, and video files
+# Supports tilde expansion (e.g. ~/Videos, ~/Movies, ~/Downloads)
+media_dirs = ["~/Videos", "~/Movies", "~/Downloads"]
+
+# Preferred media player executable ("mpv", "vlc")
+player = "mpv"
 
 [audio]
 # Speech-to-Text engine ("groq" or "local")

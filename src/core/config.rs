@@ -15,6 +15,13 @@ pub struct TomlConfig {
     pub wakeword: Option<TomlWakewordConfig>,
     pub editor: Option<TomlEditorConfig>,
     pub audio: Option<TomlAudioConfig>,
+    pub media: Option<TomlMediaConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TomlMediaConfig {
+    pub media_dirs: Option<Vec<String>>,
+    pub player: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -109,8 +116,45 @@ pub struct Settings {
     pub wakeword_model: String,
     pub wakeword_threshold: f32,
 
+    // Media Playback & Video Paths
+    pub media_dirs: Vec<String>,
+    pub media_player: String,
+
     // Runtime IPC paths
     pub daemon_socket_path: PathBuf,
+}
+
+/// Normalizes a wake word name and determines the appropriate ONNX model filename.
+/// Enforces standard wake words follow the "hey <name>" pattern (e.g. "hey jarvis"),
+/// preventing standalone names like "jarvis" from being used as the wake word and triggering false activations.
+pub fn normalize_wakeword_name(raw: &str) -> (String, String) {
+    let clean = raw.trim().to_lowercase().replace(['_', '-'], " ");
+    let parts: Vec<&str> = clean.split_whitespace().collect();
+    let normalized = parts.join(" ");
+
+    match normalized.as_str() {
+        "" | "jarvis" | "hey jarvis" => {
+            ("hey jarvis".to_string(), "hey_jarvis_v0.1.onnx".to_string())
+        }
+        "alexa" => ("alexa".to_string(), "alexa_v0.1.onnx".to_string()),
+        "mycroft" | "hey mycroft" => (
+            "hey mycroft".to_string(),
+            "hey_mycroft_v0.1.onnx".to_string(),
+        ),
+        "rhasspy" | "hey rhasspy" => (
+            "hey rhasspy".to_string(),
+            "hey_rhasspy_v0.1.onnx".to_string(),
+        ),
+        custom => {
+            let name = if custom.starts_with("hey ") {
+                custom.to_string()
+            } else {
+                format!("hey {}", custom)
+            };
+            let model_stem = name.replace(' ', "_");
+            (name, format!("{}.onnx", model_stem))
+        }
+    }
 }
 
 impl Default for Settings {
@@ -146,10 +190,17 @@ impl Default for Settings {
             initial_listen_timeout: 10.0,
             followup_listen_timeout: 8.0,
             wakeword_enabled: true,
-            wakeword_name: "jarvis".to_string(),
+            wakeword_name: "hey jarvis".to_string(),
             wakeword_model: "hey_jarvis_v0.1.onnx".to_string(),
-            wakeword_threshold: 0.22,
+            wakeword_threshold: 0.50,
             daemon_socket_path: PathBuf::from(format!("/tmp/jarvis-{}.sock", username)),
+            media_dirs: vec![
+                "~/Videos".to_string(),
+                "~/Movies".to_string(),
+                "~/Downloads".to_string(),
+                "~".to_string(),
+            ],
+            media_player: "mpv".to_string(),
         }
     }
 }
@@ -184,11 +235,11 @@ cli_tool = "claude"
 # Background wake word detection
 enabled = true
 
-# Wake word name: "jarvis" / "hey jarvis" (default), "alexa", "hey_mycroft", "hey_rhasspy"
-name = "jarvis"
+# Wake word name: "hey jarvis" (default), "hey <name>", "alexa", "hey_mycroft", "hey_rhasspy"
+name = "hey jarvis"
 
-# Sensitivity threshold (0.15 - 0.50). Lower is more sensitive for quiet speech. Default: 0.22
-threshold = 0.22
+# Sensitivity threshold (0.30 - 0.70). Default: 0.50 (requires clear 'Hey Jarvis', preventing accidental triggers from 'Jarvis' or ambient speech)
+threshold = 0.50
 
 # Optional custom ONNX model path (relative to models dir or absolute)
 # model_path = "models/hey_jarvis_v0.1.onnx"
@@ -202,6 +253,14 @@ terminal = "kitty"
 
 # Project search directories (searched when asking e.g. "open models.go from tracky-researcher-tui")
 project_dirs = ["~/Codes/personal", "~/Codes", "~/Projects", "~"]
+
+[media]
+# Directories searched when asking to play movies, TV series, or media files
+# Supports tilde expansion (e.g. ~/Videos, ~/Movies, ~/Downloads)
+media_dirs = ["~/Videos", "~/Movies", "~/Downloads"]
+
+# Preferred media player executable ("mpv", "vlc")
+player = "mpv"
 
 [audio]
 # Speech-to-Text engine ("groq" or "local")
@@ -221,6 +280,34 @@ max_recording_seconds = 25.0
 "#;
 
 impl Settings {
+    /// Resolves configured media search directories, expanding ~ to user's home path
+    pub fn resolved_media_dirs(&self) -> Vec<PathBuf> {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let home_path = PathBuf::from(&home);
+
+        if self.media_dirs.is_empty() {
+            vec![
+                home_path.join("Videos"),
+                home_path.join("Movies"),
+                home_path.join("Downloads"),
+                home_path,
+            ]
+        } else {
+            self.media_dirs
+                .iter()
+                .map(|p| {
+                    if let Some(stripped) = p.strip_prefix("~/") {
+                        home_path.join(stripped)
+                    } else if p == "~" {
+                        home_path.clone()
+                    } else {
+                        PathBuf::from(p)
+                    }
+                })
+                .collect()
+        }
+    }
+
     /// Load settings by parsing config.toml (with fallback template creation) and merging with .env
     pub fn load() -> Result<Self> {
         let config_dir = dirs_hint();
@@ -328,12 +415,35 @@ impl Settings {
         if let Ok(val) = env::var("JARVIS_WAKEWORD_ENABLED") {
             s.wakeword_enabled = val.to_lowercase() == "true" || val == "1";
         }
-        if let Ok(val) = env::var("JARVIS_WAKEWORD_NAME") {
-            s.wakeword_name = val.to_lowercase().trim().to_string();
+        if let Ok(val) = env::var("JARVIS_WAKEWORD_NAME").or_else(|_| env::var("JARVIS_WAKEWORD")) {
+            if !val.trim().is_empty() {
+                let (name, model) = normalize_wakeword_name(&val);
+                s.wakeword_name = name;
+                s.wakeword_model = model;
+            }
         }
         if let Ok(val) = env::var("JARVIS_WAKEWORD_THRESHOLD") {
             if let Ok(parsed) = val.parse::<f32>() {
-                s.wakeword_threshold = parsed;
+                if (parsed - 0.22).abs() < 0.001 {
+                    s.wakeword_threshold = 0.50;
+                } else {
+                    s.wakeword_threshold = parsed;
+                }
+            }
+        }
+        if let Ok(val) = env::var("JARVIS_MEDIA_DIRS") {
+            let dirs: Vec<String> = val
+                .split([',', ':'])
+                .map(|p| p.trim().to_string())
+                .filter(|p| !p.is_empty())
+                .collect();
+            if !dirs.is_empty() {
+                s.media_dirs = dirs;
+            }
+        }
+        if let Ok(val) = env::var("JARVIS_MEDIA_PLAYER") {
+            if !val.trim().is_empty() {
+                s.media_player = val.trim().to_string();
             }
         }
 
@@ -388,11 +498,17 @@ impl Settings {
             }
             if let Some(n) = ww.name {
                 if !n.trim().is_empty() {
-                    s.wakeword_name = n.to_lowercase().trim().to_string();
+                    let (name, model) = normalize_wakeword_name(&n);
+                    s.wakeword_name = name;
+                    s.wakeword_model = model;
                 }
             }
             if let Some(th) = ww.threshold {
-                s.wakeword_threshold = th;
+                if (th - 0.22).abs() < 0.001 {
+                    s.wakeword_threshold = 0.50;
+                } else {
+                    s.wakeword_threshold = th;
+                }
             }
             if let Some(mp) = ww.model_path {
                 if !mp.trim().is_empty() {
@@ -457,6 +573,20 @@ impl Settings {
             }
             if let Some(flt) = aud.followup_listen_timeout {
                 s.followup_listen_timeout = flt;
+            }
+        }
+
+        // Merge Media settings from TOML
+        if let Some(med) = toml_config.media {
+            if let Some(dirs) = med.media_dirs {
+                if !dirs.is_empty() {
+                    s.media_dirs = dirs;
+                }
+            }
+            if let Some(p) = med.player {
+                if !p.trim().is_empty() {
+                    s.media_player = p.trim().to_string();
+                }
             }
         }
 
@@ -534,7 +664,43 @@ mod tests {
         assert_eq!(settings.channels, 1);
         assert_eq!(settings.model_name, "gemini-3.5-flash-lite");
         assert!(settings.wakeword_enabled);
-        assert_eq!(settings.wakeword_name, "jarvis");
+        assert_eq!(settings.wakeword_name, "hey jarvis");
+        assert_eq!(settings.wakeword_threshold, 0.50);
+    }
+
+    #[test]
+    fn test_normalize_wakeword_name() {
+        assert_eq!(
+            normalize_wakeword_name("jarvis"),
+            ("hey jarvis".to_string(), "hey_jarvis_v0.1.onnx".to_string())
+        );
+        assert_eq!(
+            normalize_wakeword_name("hey jarvis"),
+            ("hey jarvis".to_string(), "hey_jarvis_v0.1.onnx".to_string())
+        );
+        assert_eq!(
+            normalize_wakeword_name("hey_jarvis"),
+            ("hey jarvis".to_string(), "hey_jarvis_v0.1.onnx".to_string())
+        );
+        assert_eq!(
+            normalize_wakeword_name("alexa"),
+            ("alexa".to_string(), "alexa_v0.1.onnx".to_string())
+        );
+        assert_eq!(
+            normalize_wakeword_name("mycroft"),
+            (
+                "hey mycroft".to_string(),
+                "hey_mycroft_v0.1.onnx".to_string()
+            )
+        );
+        assert_eq!(
+            normalize_wakeword_name("computer"),
+            ("hey computer".to_string(), "hey_computer.onnx".to_string())
+        );
+        assert_eq!(
+            normalize_wakeword_name("hey computer"),
+            ("hey computer".to_string(), "hey_computer.onnx".to_string())
+        );
     }
 
     #[test]
@@ -560,11 +726,32 @@ mod tests {
             default = "helix"
             terminal = "foot"
             project_dirs = ["/tmp/test"]
+
+            [media]
+            media_dirs = ["/tmp/videos", "/tmp/movies"]
+            player = "mpv"
         "#;
 
         let parsed: TomlConfig = toml::from_str(toml_sample).unwrap();
         assert_eq!(parsed.ai.unwrap().provider.unwrap(), "anthropic");
         assert_eq!(parsed.wakeword.unwrap().name.unwrap(), "alexa");
         assert_eq!(parsed.editor.unwrap().default.unwrap(), "helix");
+        assert_eq!(
+            parsed.media.as_ref().unwrap().player.as_deref(),
+            Some("mpv")
+        );
+        assert_eq!(parsed.media.unwrap().media_dirs.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_resolved_media_dirs() {
+        let settings = Settings {
+            media_dirs: vec!["~/Videos".to_string(), "/var/media".to_string()],
+            ..Default::default()
+        };
+        let resolved = settings.resolved_media_dirs();
+        assert_eq!(resolved.len(), 2);
+        assert!(!resolved[0].to_str().unwrap().contains('~'));
+        assert_eq!(resolved[1], PathBuf::from("/var/media"));
     }
 }
