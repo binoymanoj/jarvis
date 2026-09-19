@@ -20,7 +20,9 @@ BarWidget {
     wakeword_enabled: true,
     cli_tool: "agy",
     last_transcript: "",
-    last_reply: ""
+    last_reply: "",
+    is_busy: false,
+    current_task: ""
   })
 
   readonly property bool micActive: statusData && statusData.mic_active === true
@@ -28,6 +30,8 @@ BarWidget {
   readonly property bool wakewordEnabled: statusData ? (statusData.wakeword_enabled !== false) : true
   readonly property string cliTool: statusData ? (statusData.cli_tool || "agy") : "agy"
   readonly property color barForeground: bar ? bar.barForeground : Color.foreground
+  readonly property bool isBusy: statusData ? (statusData.is_busy === true || currentState === "processing") : false
+  readonly property string currentTask: statusData ? (statusData.current_task || "") : ""
 
   property bool previewOpen: false
   property bool popoutSwitchClosing: false
@@ -84,7 +88,7 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     tooltipText: root.micActive ? "Jarvis: Listening (Mic On)" :
-                 (root.currentState === "processing" ? "Jarvis: Thinking..." :
+                 (root.isBusy ? ("Jarvis: Working" + (root.currentTask ? (" - " + root.currentTask) : "...")) :
                  (root.currentState === "speaking" ? "Jarvis: Speaking..." : "Jarvis: Ready"))
 
     onPressed: function(buttonCode) {
@@ -106,7 +110,44 @@ BarWidget {
           font.family: Style.font.family
           font.pixelSize: Style.bar.iconFont
           color: root.micActive ? Color.accent :
-                 (root.currentState !== "idle" ? Color.accent : root.barForeground)
+                 (root.isBusy ? Color.accent :
+                 (root.currentState !== "idle" ? Color.accent : root.barForeground))
+
+          SequentialAnimation on scale {
+            running: root.isBusy && !root.micActive
+            loops: Animation.Infinite
+            NumberAnimation { from: 1.0; to: 1.15; duration: 450; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 1.15; to: 1.0; duration: 450; easing.type: Easing.InOutSine }
+          }
+        }
+
+        // Active Working / Background Task Spinner Indicator
+        Item {
+          id: busyIndicator
+          visible: root.isBusy && !root.micActive
+          anchors.top: parent.top
+          anchors.topMargin: -Style.space(2)
+          anchors.right: parent.right
+          anchors.rightMargin: -Style.space(3)
+          width: Style.space(10)
+          height: Style.space(10)
+
+          Text {
+            id: spinnerGlyph
+            anchors.centerIn: parent
+            text: "󰑐"
+            font.family: Style.font.family
+            font.pixelSize: Style.space(9)
+            color: Color.accent
+
+            RotationAnimation on rotation {
+              running: busyIndicator.visible
+              loops: Animation.Infinite
+              from: 0
+              to: 360
+              duration: 800
+            }
+          }
         }
 
         // Microphone Active Indicator Dot
@@ -207,18 +248,20 @@ BarWidget {
               radius: width / 2
               anchors.verticalCenter: parent.verticalCenter
               color: root.micActive ? "#ef4444" :
-                     (root.currentState === "processing" ? "#f59e0b" :
+                     (root.isBusy ? Color.accent :
                      (root.currentState === "speaking" ? Color.accent : "#22c55e"))
             }
 
             Text {
               text: root.micActive ? "Mic Active (Listening)" :
-                    (root.currentState === "processing" ? "Thinking..." :
+                    (root.isBusy ? ("Working: " + (root.currentTask || "Processing...")) :
                     (root.currentState === "speaking" ? "Speaking..." :
                     (root.wakewordEnabled ? "Ready (Wake word active)" : "Standby (Idle)")))
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
               color: Qt.darker(Color.popups.text, 1.3)
+              elide: Text.ElideRight
+              width: parent.parent.width - Style.space(30)
             }
           }
         }

@@ -51,12 +51,16 @@ pub struct CliArgs {
     pub daemon: bool,
 
     #[arg(
+        short = 'W',
         long = "wakeword-toggle",
         help = "Toggle background wake word detection on or off"
     )]
     pub wakeword_toggle: bool,
 
-    #[arg(long = "wakeword-status", help = "Print current wake word detection status")]
+    #[arg(
+        long = "wakeword-status",
+        help = "Print current wake word detection status"
+    )]
     pub wakeword_status: bool,
 
     #[arg(
@@ -66,7 +70,10 @@ pub struct CliArgs {
     )]
     pub command: Option<String>,
 
-    #[arg(long = "no-speech", help = "Suppress spoken audio responses (text-only mode)")]
+    #[arg(
+        long = "no-speech",
+        help = "Suppress spoken audio responses (text-only mode)"
+    )]
     pub no_speech: bool,
 
     #[arg(
@@ -108,4 +115,40 @@ pub struct CliArgs {
         help = "Launch a workflow preset across Hyprland workspaces"
     )]
     pub workflow_launch: Option<String>,
+
+    #[arg(
+        short = 'l',
+        long = "logs",
+        help = "Display recent Jarvis activity history and logs"
+    )]
+    pub logs: bool,
+
+    #[arg(
+        short = 'f',
+        long = "follow",
+        help = "Follow log stream in real time (used with -l / --logs)"
+    )]
+    pub follow: bool,
+
+    #[arg(long = "logs-path", help = "Print the absolute path to jarvis.log")]
+    pub logs_path: bool,
+
+    #[arg(
+        long = "confirm-tui",
+        help = "Run interactive confirmation TUI",
+        hide = true
+    )]
+    pub confirm_tui: bool,
+
+    #[arg(long = "confirm-title", hide = true)]
+    pub confirm_title: Option<String>,
+
+    #[arg(long = "confirm-prompt", hide = true)]
+    pub confirm_prompt: Option<String>,
+
+    #[arg(long = "confirm-result-file", hide = true)]
+    pub confirm_result_file: Option<String>,
+
+    #[arg(long = "confirm-timeout", hide = true)]
+    pub confirm_timeout: Option<u32>,
 }

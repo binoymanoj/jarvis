@@ -19,6 +19,10 @@ pub struct Status {
     pub last_transcript: String,
     pub last_reply: String,
     pub updated_at: f64,
+    #[serde(default)]
+    pub is_busy: bool,
+    #[serde(default)]
+    pub current_task: String,
 }
 
 impl Default for Status {
@@ -38,6 +42,8 @@ impl Default for Status {
             last_transcript: String::new(),
             last_reply: String::new(),
             updated_at: now,
+            is_busy: false,
+            current_task: String::new(),
         }
     }
 }
@@ -116,6 +122,7 @@ pub fn set_recording(prompt_hint: &str) {
     update_status(|s| {
         s.active = true;
         s.state = "recording".to_string();
+        s.mic_active = true;
         if !prompt_hint.is_empty() {
             s.last_transcript = prompt_hint.to_string();
         }
@@ -125,17 +132,42 @@ pub fn set_recording(prompt_hint: &str) {
 pub fn set_processing(transcript: &str) {
     update_status(|s| {
         s.active = true;
+        s.is_busy = true;
         s.state = "processing".to_string();
+        s.mic_active = false;
         if !transcript.is_empty() {
             s.last_transcript = transcript.to_string();
+            s.current_task = transcript.to_string();
         }
+    });
+}
+
+pub fn set_busy(task: &str) {
+    update_status(|s| {
+        s.active = true;
+        s.is_busy = true;
+        s.state = "processing".to_string();
+        s.mic_active = false;
+        if !task.is_empty() {
+            s.current_task = task.to_string();
+        }
+    });
+}
+
+pub fn clear_busy() {
+    update_status(|s| {
+        s.is_busy = false;
+        s.current_task.clear();
     });
 }
 
 pub fn set_speaking(reply: &str) {
     update_status(|s| {
         s.active = true;
+        s.is_busy = false;
+        s.current_task.clear();
         s.state = "speaking".to_string();
+        s.mic_active = false;
         if !reply.is_empty() {
             s.last_reply = reply.to_string();
         }
@@ -145,6 +177,9 @@ pub fn set_speaking(reply: &str) {
 pub fn set_idle(wakeword_active: bool) {
     update_status(|s| {
         s.active = false;
+        s.is_busy = false;
+        s.current_task.clear();
+        s.mic_active = false;
         s.state = if wakeword_active {
             "wakeword".to_string()
         } else {
@@ -211,8 +246,11 @@ mod tests {
         assert_eq!(status.last_transcript, deserialized.last_transcript);
     }
 
+    static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_atomic_state_write_and_read() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let status = update_status(|s| {
             s.state = "processing".to_string();
             s.last_transcript = "open spotify".to_string();
@@ -224,5 +262,19 @@ mod tests {
         let read = read_status();
         assert_eq!(read.state, "processing");
         assert_eq!(read.last_transcript, "open spotify");
+    }
+
+    #[test]
+    fn test_busy_state_management() {
+        let _guard = TEST_MUTEX.lock().unwrap();
+        set_busy("Analyzing battery metrics...");
+        let read = read_status();
+        assert!(read.is_busy);
+        assert_eq!(read.current_task, "Analyzing battery metrics...");
+
+        clear_busy();
+        let read_cleared = read_status();
+        assert!(!read_cleared.is_busy);
+        assert!(read_cleared.current_task.is_empty());
     }
 }

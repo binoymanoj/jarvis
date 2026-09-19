@@ -125,13 +125,15 @@ fn test_gemini_tools_declarations_against_registry() {
     let reg = build_tool_registry(&settings, flag);
 
     let declarations = reg.gemini_function_declarations();
-    let list = declarations.as_array().expect("Should be array of tool groups");
+    let list = declarations
+        .as_array()
+        .expect("Should be array of tool groups");
     assert_eq!(list.len(), 1);
 
     let decls = list[0]["functionDeclarations"]
         .as_array()
         .expect("Should have functionDeclarations");
-    assert_eq!(decls.len(), 51);
+    assert_eq!(decls.len(), 55);
 
     for decl in decls {
         assert!(decl["name"].is_string());

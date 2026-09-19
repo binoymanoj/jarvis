@@ -8,13 +8,14 @@ use crate::cli::args::CliArgs;
 use crate::core::config::Settings;
 use crate::core::error::Result;
 use crate::core::state::{
-    daemon_pid_file_path, is_pid_running, pid_file_path, read_pid, read_status,
+    clear_busy, daemon_pid_file_path, is_pid_running, pid_file_path, read_pid, read_status,
     remove_file_if_exists, set_idle, set_processing, set_recording, set_speaking, update_status,
     write_pid,
 };
 use crate::tools::hyprland::HyprlandController;
 use crate::tools::workflow::WorkflowManager;
 use crate::ui::hud::JarvisHUD;
+use crate::ui::notification::TaskNotifier;
 use crate::ui::signals::{DaemonSignal, SignalHandler};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
@@ -63,16 +64,20 @@ pub fn stop_running_session() -> bool {
     // 3. Silence any active audio playback
     let _ = Command::new("pkill").arg("-9").arg("pw-play").output();
 
-    // 4. Hide Quickshell HUD immediately via IPC
+    // 4. Dismiss active task notification and clear busy state
+    tokio::spawn(async move {
+        TaskNotifier::global().cancel().await;
+    });
+    clear_busy();
+
+    // 5. Hide Quickshell HUD immediately via IPC
     let hud = JarvisHUD::new();
     tokio::spawn(async move {
         hud.hide().await;
     });
 
-    // 5. Reset status
-    let daemon_alive = read_pid(&daemon_path)
-        .map(is_pid_running)
-        .unwrap_or(false);
+    // 6. Reset status
+    let daemon_alive = read_pid(&daemon_path).map(is_pid_running).unwrap_or(false);
     set_idle(daemon_alive);
 
     killed
@@ -146,16 +151,38 @@ pub fn restart_all() {
     println!("\x1b[1;32m✔ Jarvis restart complete.\x1b[0m");
 }
 
-pub async fn run_command_headless(prompt: &str, speak_reply: bool, settings: &Settings) -> Result<()> {
-    let agent = JarvisAgent::new(settings);
-    let reply = agent.process_prompt(prompt).await?;
-    println!("\x1b[1;36m󰚩 Jarvis:\x1b[0m {reply}");
+pub async fn run_command_headless(
+    prompt: &str,
+    speak_reply: bool,
+    settings: &Settings,
+) -> Result<()> {
+    info!("Headless command received: \"{prompt}\"");
+    set_processing(prompt);
 
-    if speak_reply {
-        let tts = TextToSpeech::from_settings(settings);
-        tts.speak(&reply).await?;
+    let agent = JarvisAgent::new(settings);
+    let reply_res = agent.process_prompt(prompt).await;
+
+    match reply_res {
+        Ok(reply) => {
+            if TaskNotifier::global().is_active() {
+                TaskNotifier::global().finish_smart(&reply).await;
+            }
+            clear_busy();
+            info!("Jarvis reply: \"{reply}\"");
+            println!("\x1b[1;36m󰚩 Jarvis:\x1b[0m {reply}");
+
+            if speak_reply {
+                let tts = TextToSpeech::from_settings(settings);
+                tts.speak(&reply).await?;
+            }
+            Ok(())
+        }
+        Err(e) => {
+            TaskNotifier::global().cancel().await;
+            clear_busy();
+            Err(e)
+        }
     }
-    Ok(())
 }
 
 pub async fn run_voice_activation(
@@ -165,10 +192,10 @@ pub async fn run_voice_activation(
     force_submit_event: Arc<AtomicBool>,
     settings: &Settings,
 ) -> Result<()> {
-    let hud = JarvisHUD::new();
+    let hud = Arc::new(JarvisHUD::new());
     let recorder = AudioRecorder::from_settings(settings);
     let stt = SpeechToText::from_settings(settings);
-    let agent = JarvisAgent::new(settings);
+    let agent = JarvisAgent::with_hud(settings, hud.clone());
     let tts = if speak_reply {
         Some(TextToSpeech::from_settings(settings))
     } else {
@@ -261,13 +288,14 @@ pub async fn run_voice_activation(
             break;
         }
 
+        info!("User voice transcript: \"{transcript}\"");
         println!("\x1b[1;32mUser:\x1b[0m \"{transcript}\"");
         set_processing(&transcript);
-        hud.show_thinking(Some(&format!("\"{transcript}\"")))
-            .await;
+        hud.show_thinking(Some(&format!("\"{transcript}\""))).await;
 
         // Step 4: Check for exit / dismissal phrase
         if is_exit_command(&transcript) {
+            clear_busy();
             let farewell = "Very well, sir. Have a wonderful day.";
             println!("\x1b[1;36m󰚩 Jarvis:\x1b[0m {farewell}");
             set_speaking(farewell);
@@ -280,15 +308,35 @@ pub async fn run_voice_activation(
 
         // Step 5: Process through Gemini Flash agent
         if cancel_event.load(Ordering::SeqCst) {
+            TaskNotifier::global().cancel().await;
+            clear_busy();
             break;
         }
 
-        let reply = agent.process_prompt(&transcript).await?;
+        let reply_res = agent.process_prompt(&transcript).await;
 
         if cancel_event.load(Ordering::SeqCst) {
+            TaskNotifier::global().cancel().await;
+            clear_busy();
             break;
         }
 
+        let reply = match reply_res {
+            Ok(r) => {
+                if TaskNotifier::global().is_active() {
+                    TaskNotifier::global().finish_smart(&r).await;
+                }
+                clear_busy();
+                r
+            }
+            Err(e) => {
+                TaskNotifier::global().cancel().await;
+                clear_busy();
+                return Err(e);
+            }
+        };
+
+        info!("Jarvis reply: \"{reply}\"");
         println!("\x1b[1;36m󰚩 Jarvis:\x1b[0m {reply}");
 
         // Step 6: Speak reply
@@ -310,6 +358,8 @@ pub async fn run_voice_activation(
     }
 
     // Cleanup session
+    TaskNotifier::global().cancel().await;
+    clear_busy();
     hud.hide().await;
     if !is_daemon {
         remove_file_if_exists(&session_path);
@@ -349,7 +399,10 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
     let cancel_event = Arc::new(AtomicBool::new(false));
     let force_submit = Arc::new(AtomicBool::new(false));
 
-    println!("\x1b[1;36m󰚩 Jarvis Daemon active.\x1b[0m Listening for \x1b[1;32m'Hey Jarvis'\x1b[0m in background...");
+    println!(
+        "\x1b[1;36m󰚩 Jarvis Daemon active.\x1b[0m Listening for \x1b[1;32m'{}'\x1b[0m in background...",
+        detector.name()
+    );
 
     // Spawn signal processing background task
     let sig_stop = stop_signal.clone();
@@ -415,7 +468,8 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
                         return;
                     }
 
-                    info!("󰚩 Wake word 'Hey Jarvis' activated!");
+                    let ww_name = &s.wakeword_name;
+                    info!("󰚩 Wake word '{ww_name}' activated!");
                     c.store(false, Ordering::SeqCst);
                     f.store(false, Ordering::SeqCst);
 
@@ -444,14 +498,76 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
     Ok(())
 }
 
+fn show_logs(follow: bool) -> Result<()> {
+    let log_path = crate::core::logging::get_log_file_path();
+    if !log_path.exists() {
+        println!(
+            "\x1b[33mNo log file found at {}.\x1b[0m",
+            log_path.display()
+        );
+        println!("Start the daemon or execute an action with Jarvis to generate activity logs.");
+        return Ok(());
+    }
+
+    if follow {
+        println!(
+            "\x1b[1;36m󰚩 Following Jarvis live activity logs ({})\x1b[0m",
+            log_path.display()
+        );
+        println!("\x1b[2mPress Ctrl+C to stop following.\x1b[0m\n");
+        let _ = Command::new("tail")
+            .arg("-n")
+            .arg("40")
+            .arg("-f")
+            .arg(&log_path)
+            .status();
+    } else {
+        println!("\x1b[1;36m󰚩 Jarvis Activity History (last 40 entries):\x1b[0m");
+        println!("\x1b[2mLocation: {}\x1b[0m\n", log_path.display());
+        let _ = Command::new("tail")
+            .arg("-n")
+            .arg("40")
+            .arg(&log_path)
+            .status();
+        println!("\n\x1b[2mTip: Run 'jarvis -l -f' to follow logs in real time, or inspect with 'less +G {}'.\x1b[0m", log_path.display());
+    }
+    Ok(())
+}
+
 pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
+    if args.logs_path {
+        println!("{}", crate::core::logging::get_log_file_path().display());
+        return Ok(());
+    }
+
+    if args.logs || args.follow {
+        show_logs(args.follow)?;
+        return Ok(());
+    }
+
     if args.quit {
         quit_all();
+        crate::ui::send_desktop_notification(
+            "󰚩",
+            "Jarvis Terminated",
+            "Background daemon and HUD stopped.",
+            2500,
+            "normal",
+        )
+        .await;
         return Ok(());
     }
 
     if args.restart {
         restart_all();
+        crate::ui::send_desktop_notification(
+            "󰚩",
+            "Jarvis Restarted",
+            "Daemon restarted and menubar reloaded.",
+            3000,
+            "normal",
+        )
+        .await;
         return Ok(());
     }
 
@@ -459,6 +575,14 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
         let killed = stop_running_session();
         if killed {
             println!("\x1b[1;31m󰚩 Jarvis stopped and silenced.\x1b[0m");
+            crate::ui::send_desktop_notification(
+                "󰚩",
+                "Jarvis Stopped",
+                "Active session terminated and audio silenced.",
+                2500,
+                "normal",
+            )
+            .await;
         } else {
             println!("\x1b[2mNo active Jarvis session found to stop.\x1b[0m");
         }
@@ -473,6 +597,25 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
         });
         let status_str = if new_val { "ENABLED" } else { "DISABLED" };
         println!("\x1b[1;36m󰚩 Jarvis Wake Word:\x1b[0m \x1b[1m{status_str}\x1b[0m");
+        if new_val {
+            crate::ui::send_desktop_notification(
+                "󰚩",
+                "Jarvis Wake Word: Enabled",
+                "Listening in background for 'Hey Jarvis'...",
+                3000,
+                "normal",
+            )
+            .await;
+        } else {
+            crate::ui::send_desktop_notification(
+                "󰚩",
+                "Jarvis Wake Word: Disabled",
+                "Microphone listening paused.",
+                3000,
+                "normal",
+            )
+            .await;
+        }
         return Ok(());
     }
 
@@ -491,6 +634,21 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
             "\x1b[2mStopped\x1b[0m"
         };
         println!("Wake Word: {status_str} | Daemon: {daemon_str}");
+        return Ok(());
+    }
+
+    if args.confirm_tui {
+        let title = args
+            .confirm_title
+            .as_deref()
+            .unwrap_or("Jarvis Confirmation");
+        let prompt = args
+            .confirm_prompt
+            .as_deref()
+            .unwrap_or("Are you sure you want to proceed?");
+        let result_file = args.confirm_result_file.as_deref();
+        let timeout = args.confirm_timeout.unwrap_or(15);
+        crate::ui::confirmation::run_confirm_tui(title, prompt, result_file, timeout).await;
         return Ok(());
     }
 
@@ -526,7 +684,14 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
 
         let cancel_event = Arc::new(AtomicBool::new(false));
         let force_submit = Arc::new(AtomicBool::new(false));
-        return run_voice_activation(!args.no_speech, false, cancel_event, force_submit, &settings).await;
+        return run_voice_activation(
+            !args.no_speech,
+            false,
+            cancel_event,
+            force_submit,
+            &settings,
+        )
+        .await;
     }
 
     if let Some(cmd) = args.command {
@@ -558,8 +723,8 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
 
     if let Some(name) = args.workflow_delete {
         let hyprland = Arc::new(HyprlandController::new());
-        let mgr = WorkflowManager::new(hyprland);
-        let res = mgr.delete_workflow(&name)?;
+        let mgr = WorkflowManager::with_settings(hyprland, Some(settings.clone()));
+        let res = mgr.delete_workflow(&name).await?;
         println!("\x1b[1;33m󰚩 Workflow Manager:\x1b[0m {res}");
         return Ok(());
     }
@@ -569,18 +734,46 @@ pub async fn run_cli(args: CliArgs, settings: Settings) -> Result<()> {
         let mgr = WorkflowManager::new(hyprland);
         let res = mgr.launch_workflow(&name).await?;
         println!("\x1b[1;32m󰚩 Workflow Manager:\x1b[0m {res}");
+        crate::ui::send_desktop_notification(
+            "󰌨",
+            "Workflow Activated",
+            &format!("Switched to '{name}' environment"),
+            3000,
+            "normal",
+        )
+        .await;
         return Ok(());
     }
 
     // Status display
     println!("\x1b[1;36m󰚩 Omarchy Jarvis\x1b[0m v0.2.0 (100% Rust Native)");
     println!("\x1b[2mArchitecture:\x1b[0m     x86_64-unknown-linux-gnu");
-    println!("\x1b[2mAI Provider:\x1b[0m      \x1b[1m{}\x1b[0m", settings.ai_provider);
+    println!(
+        "\x1b[2mAI Provider:\x1b[0m      \x1b[1m{}\x1b[0m",
+        settings.ai_provider
+    );
     println!("\x1b[2mReasoning Model:\x1b[0m  {}", settings.model_name);
-    println!("\x1b[2mWake Word:\x1b[0m        '{}' (threshold: {:.2})", settings.wakeword_name, settings.wakeword_threshold);
-    println!("\x1b[2mEditor / Terminal:\x1b[0m {} via {}", settings.editor, settings.terminal);
-    println!("\x1b[2mSTT Engine:\x1b[0m       {} ({})", settings.stt_engine, settings.whisper_model);
-    println!("\x1b[2mTTS Engine:\x1b[0m       {} ({})", settings.tts_engine, if settings.tts_engine == "edge" { &settings.edge_voice } else { &settings.piper_voice });
+    println!(
+        "\x1b[2mWake Word:\x1b[0m        '{}' (threshold: {:.2})",
+        settings.wakeword_name, settings.wakeword_threshold
+    );
+    println!(
+        "\x1b[2mEditor / Terminal:\x1b[0m {} via {}",
+        settings.editor, settings.terminal
+    );
+    println!(
+        "\x1b[2mSTT Engine:\x1b[0m       {} ({})",
+        settings.stt_engine, settings.whisper_model
+    );
+    println!(
+        "\x1b[2mTTS Engine:\x1b[0m       {} ({})",
+        settings.tts_engine,
+        if settings.tts_engine == "edge" {
+            &settings.edge_voice
+        } else {
+            &settings.piper_voice
+        }
+    );
 
     let active_key_status = match settings.require_active_provider_key() {
         Ok(_) => "\x1b[32mConfigured\x1b[0m",

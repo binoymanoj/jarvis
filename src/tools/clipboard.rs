@@ -22,8 +22,10 @@ impl Default for ClipboardManager {
 
 impl ClipboardManager {
     pub fn new() -> Self {
-        let wl_paste_bin = which::which("wl-paste").unwrap_or_else(|_| PathBuf::from("/usr/bin/wl-paste"));
-        let wl_copy_bin = which::which("wl-copy").unwrap_or_else(|_| PathBuf::from("/usr/bin/wl-copy"));
+        let wl_paste_bin =
+            which::which("wl-paste").unwrap_or_else(|_| PathBuf::from("/usr/bin/wl-paste"));
+        let wl_copy_bin =
+            which::which("wl-copy").unwrap_or_else(|_| PathBuf::from("/usr/bin/wl-copy"));
         Self {
             wl_paste_bin,
             wl_copy_bin,
@@ -80,6 +82,12 @@ impl ClipboardManager {
         } else {
             text.to_string()
         };
+
+        if !crate::ui::TaskNotifier::global().is_active() {
+            crate::ui::send_desktop_notification("󰅍", "Copied to Clipboard", &preview, 2500, "low")
+                .await;
+        }
+
         Ok(format!("Copied to clipboard: \"{preview}\""))
     }
 }
@@ -154,9 +162,9 @@ impl Tool for SetClipboardTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let text = args["text"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("set_clipboard".into(), "text string is required".into()))?;
+        let text = args["text"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("set_clipboard".into(), "text string is required".into())
+        })?;
 
         self.clipboard.set_clipboard(text).await
     }

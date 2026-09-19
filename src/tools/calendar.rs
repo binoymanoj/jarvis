@@ -54,7 +54,12 @@ impl CalendarManager {
         let mut clean = time_str.trim().to_lowercase();
 
         // Check standard date formats
-        for fmt in &["%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"] {
+        for fmt in &[
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+        ] {
             if let Ok(dt) = NaiveDateTime::parse_from_str(&clean, fmt) {
                 return dt;
             }
@@ -74,13 +79,29 @@ impl CalendarManager {
             day_offset = 0;
             clean = clean.replace("today", "").trim().to_string();
         } else {
-            let weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+            let weekdays = [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            ];
             for (idx, day) in weekdays.iter().enumerate() {
                 if clean.contains(day) {
                     let current_weekday = now.weekday().num_days_from_monday() as usize;
                     let days_ahead = (idx + 7 - current_weekday) % 7;
-                    day_offset = if days_ahead == 0 { 7 } else { days_ahead as i64 };
-                    clean = clean.replace(day, "").replace("next", "").trim().to_string();
+                    day_offset = if days_ahead == 0 {
+                        7
+                    } else {
+                        days_ahead as i64
+                    };
+                    clean = clean
+                        .replace(day, "")
+                        .replace("next", "")
+                        .trim()
+                        .to_string();
                     break;
                 }
             }
@@ -93,7 +114,10 @@ impl CalendarManager {
         let re_12h = Regex::new(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)").unwrap();
         if let Some(cap) = re_12h.captures(&clean) {
             let mut hour: u32 = cap[1].parse().unwrap_or(9);
-            let minute: u32 = cap.get(2).map(|m| m.as_str().parse().unwrap_or(0)).unwrap_or(0);
+            let minute: u32 = cap
+                .get(2)
+                .map(|m| m.as_str().parse().unwrap_or(0))
+                .unwrap_or(0);
             let meridiem = &cap[3];
             if meridiem == "pm" && hour != 12 {
                 hour += 12;
@@ -197,7 +221,9 @@ impl CalendarManager {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .spawn();
-                return Ok(format!("Scheduled '{title}' for {nice_start} and opened in Thunderbird."));
+                return Ok(format!(
+                    "Scheduled '{title}' for {nice_start} and opened in Thunderbird."
+                ));
             }
         }
 
@@ -208,7 +234,20 @@ impl CalendarManager {
             .stderr(Stdio::null())
             .spawn();
 
-        Ok(format!("Scheduled '{title}' for {nice_start}. Opened Google Calendar for confirmation, sir."))
+        if !crate::ui::TaskNotifier::global().is_active() {
+            crate::ui::send_desktop_notification(
+                "󰸗",
+                "Event Scheduled",
+                &format!("'{title}' for {nice_start}"),
+                4000,
+                "normal",
+            )
+            .await;
+        }
+
+        Ok(format!(
+            "Scheduled '{title}' for {nice_start}. Opened Google Calendar for confirmation, sir."
+        ))
     }
 
     pub async fn set_reminder(&self, minutes: i64, message: &str) -> Result<String> {
@@ -221,8 +260,20 @@ impl CalendarManager {
                 .output()
                 .await?;
 
-            let remind_time = (Local::now() + Duration::minutes(mins)).format("%I:%M %p").to_string();
+            let remind_time = (Local::now() + Duration::minutes(mins))
+                .format("%I:%M %p")
+                .to_string();
             if output.status.success() {
+                if !crate::ui::TaskNotifier::global().is_active() {
+                    crate::ui::send_desktop_notification(
+                        "󰔛",
+                        "Reminder Configured",
+                        &format!("In {mins} minutes ({remind_time}): '{message}'"),
+                        4000,
+                        "normal",
+                    )
+                    .await;
+                }
                 Ok(format!("Reminder set for {mins} minutes from now (at {remind_time}): '{message}', sir."))
             } else {
                 let err = String::from_utf8_lossy(&output.stderr);
@@ -329,12 +380,15 @@ impl Tool for ScheduleEventTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let title = args["title"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("schedule_event".into(), "title string is required".into()))?;
-        let start_time = args["start_time"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("schedule_event".into(), "start_time string is required".into()))?;
+        let title = args["title"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("schedule_event".into(), "title string is required".into())
+        })?;
+        let start_time = args["start_time"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "schedule_event".into(),
+                "start_time string is required".into(),
+            )
+        })?;
         let end_time = args["end_time"].as_str();
         let description = args["description"].as_str().unwrap_or("");
         let provider = args["provider"].as_str().unwrap_or("auto");
@@ -383,12 +437,12 @@ impl Tool for SetReminderTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let minutes = args["minutes"]
-            .as_i64()
-            .ok_or_else(|| JarvisError::ToolParameter("set_reminder".into(), "minutes integer is required".into()))?;
-        let message = args["message"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("set_reminder".into(), "message string is required".into()))?;
+        let minutes = args["minutes"].as_i64().ok_or_else(|| {
+            JarvisError::ToolParameter("set_reminder".into(), "minutes integer is required".into())
+        })?;
+        let message = args["message"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("set_reminder".into(), "message string is required".into())
+        })?;
 
         self.calendar.set_reminder(minutes, message).await
     }

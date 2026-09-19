@@ -39,10 +39,19 @@ impl NoteManager {
         }
     }
 
-    pub async fn create_note(&self, title: &str, content: &str, open_in_editor: bool) -> Result<String> {
+    pub async fn create_note(
+        &self,
+        title: &str,
+        content: &str,
+        open_in_editor: bool,
+    ) -> Result<String> {
         let re = Regex::new(r"[^\w\s-]").unwrap();
         let clean = re.replace_all(title, "").trim().to_string();
-        let safe_title = if clean.is_empty() { "Untitled_Note" } else { &clean };
+        let safe_title = if clean.is_empty() {
+            "Untitled_Note"
+        } else {
+            &clean
+        };
         let filename = format!("{}.md", safe_title.replace(' ', "_"));
         let file_path = self.notes_dir.join(&filename);
 
@@ -69,6 +78,17 @@ impl NoteManager {
                     .stderr(Stdio::null())
                     .spawn();
             }
+        }
+
+        if !crate::ui::TaskNotifier::global().is_active() {
+            crate::ui::send_desktop_notification(
+                "󰏪",
+                "Note Saved",
+                &format!("'{title}' saved to {filename}"),
+                3500,
+                "normal",
+            )
+            .await;
         }
 
         Ok(format!("{action} note '{title}' in {filename}, sir."))
@@ -103,7 +123,11 @@ impl NoteManager {
         for (path, mtime) in selected {
             let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Note");
             let dt: chrono::DateTime<Local> = mtime.into();
-            lines.push(format!("- {} (modified {})", stem, dt.format("%b %d, %H:%M")));
+            lines.push(format!(
+                "- {} (modified {})",
+                stem,
+                dt.format("%b %d, %H:%M")
+            ));
         }
 
         Ok(lines.join("\n"))
@@ -156,12 +180,12 @@ impl Tool for CreateNoteTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let title = args["title"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("create_note".into(), "title string is required".into()))?;
-        let content = args["content"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("create_note".into(), "content string is required".into()))?;
+        let title = args["title"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("create_note".into(), "title string is required".into())
+        })?;
+        let content = args["content"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("create_note".into(), "content string is required".into())
+        })?;
         let open_editor = args["open_editor"].as_bool().unwrap_or(false);
 
         self.notes.create_note(title, content, open_editor).await
