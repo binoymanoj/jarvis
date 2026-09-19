@@ -16,6 +16,8 @@ pub struct ThemeColors {
     pub magenta: String,
     pub blue: String,
     pub active_border: String,
+    pub selection: String,
+    pub bright_red: String,
 }
 
 impl Default for ThemeColors {
@@ -31,6 +33,8 @@ impl Default for ThemeColors {
             magenta: "#d946ef".to_string(),
             blue: "#38bdf8".to_string(),
             active_border: "#a8adb0".to_string(),
+            selection: "#343d41".to_string(),
+            bright_red: "#de6145".to_string(),
         }
     }
 }
@@ -88,7 +92,10 @@ pub fn load_omarchy_theme() -> ThemeColors {
             if let Some(v) = map.get("background") {
                 theme.background = v.clone();
             }
-            if let Some(v) = map.get("dark_background").or_else(|| map.get("darker_background")) {
+            if let Some(v) = map
+                .get("dark_background")
+                .or_else(|| map.get("darker_background"))
+            {
                 theme.dark_background = v.clone();
             }
             if let Some(v) = map.get("muted") {
@@ -106,10 +113,19 @@ pub fn load_omarchy_theme() -> ThemeColors {
             if let Some(v) = map.get("active_border_color") {
                 theme.active_border = v.clone();
             }
+            if let Some(v) = map.get("selection") {
+                theme.selection = v.clone();
+            }
+            if let Some(v) = map.get("bright_red").or_else(|| map.get("red")) {
+                theme.bright_red = v.clone();
+            }
         }
     }
 
-    debug!("Loaded Omarchy theme: '{}' (accent: {})", theme.name, theme.accent);
+    debug!(
+        "Loaded Omarchy theme: '{}' (accent: {})",
+        theme.name, theme.accent
+    );
     theme
 }
 

@@ -1,20 +1,35 @@
+use crate::core::config::Settings;
 use crate::core::error::Result;
 use crate::tools::omarchy::OmarchyBridge;
 use crate::tools::Tool;
+use crate::ui::confirmation::{request_confirmation, ConfirmationRequest};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
+use tracing::info;
 
 pub struct SystemPowerManager {
     omarchy: Arc<OmarchyBridge>,
+    settings: Settings,
 }
 
 impl SystemPowerManager {
-    pub fn new(omarchy: Arc<OmarchyBridge>) -> Self {
-        Self { omarchy }
+    pub fn new(omarchy: Arc<OmarchyBridge>, settings: Settings) -> Self {
+        Self { omarchy, settings }
     }
 
     pub async fn lock_screen(&self) -> Result<String> {
+        if !crate::ui::TaskNotifier::global().is_active() {
+            crate::ui::send_desktop_notification(
+                "󰌾",
+                "Lock Screen",
+                "Locking desktop session...",
+                2000,
+                "low",
+            )
+            .await;
+        }
+
         let out = self.omarchy.run("system lock", &[]).await?;
         if out.is_empty() {
             Ok("Screen locked.".to_string())
@@ -24,6 +39,20 @@ impl SystemPowerManager {
     }
 
     pub async fn logout_system(&self) -> Result<String> {
+        let req = ConfirmationRequest {
+            title: "Confirm System Logout",
+            prompt: "Are you sure you want to log out of your session?",
+            spoken_prompt: "Are you sure you want to log out? Please confirm: yes or no.",
+            icon_name: "system-log-out",
+            timeout_secs: 15,
+        };
+
+        let confirmed = request_confirmation(&req, Some(&self.settings)).await;
+        if !confirmed {
+            info!("System logout cancelled by user.");
+            return Ok("Logout cancelled.".to_string());
+        }
+
         let out = self.omarchy.run("system logout", &[]).await?;
         if out.is_empty() {
             Ok("Logging out...".to_string())
@@ -33,6 +62,20 @@ impl SystemPowerManager {
     }
 
     pub async fn reboot_system(&self) -> Result<String> {
+        let req = ConfirmationRequest {
+            title: "Confirm System Reboot",
+            prompt: "Are you sure you want to reboot the system?",
+            spoken_prompt: "Are you sure you want to reboot the system? Please confirm: yes or no.",
+            icon_name: "system-reboot",
+            timeout_secs: 15,
+        };
+
+        let confirmed = request_confirmation(&req, Some(&self.settings)).await;
+        if !confirmed {
+            info!("System reboot cancelled by user.");
+            return Ok("Reboot cancelled.".to_string());
+        }
+
         let out = self.omarchy.run("system reboot", &[]).await?;
         if out.is_empty() {
             Ok("Rebooting system...".to_string())
@@ -42,6 +85,21 @@ impl SystemPowerManager {
     }
 
     pub async fn shutdown_system(&self) -> Result<String> {
+        let req = ConfirmationRequest {
+            title: "Confirm System Shutdown",
+            prompt: "Are you sure you want to shut down the computer?",
+            spoken_prompt:
+                "Are you sure you want to shut down the computer? Please confirm: yes or no.",
+            icon_name: "system-shutdown",
+            timeout_secs: 15,
+        };
+
+        let confirmed = request_confirmation(&req, Some(&self.settings)).await;
+        if !confirmed {
+            info!("System shutdown cancelled by user.");
+            return Ok("Shutdown cancelled.".to_string());
+        }
+
         let out = self.omarchy.run("system shutdown", &[]).await?;
         if out.is_empty() {
             Ok("Shutting down system...".to_string())
@@ -75,6 +133,16 @@ impl SystemPowerManager {
                 Ok(format!("Bluetooth status: {out}"))
             }
         } else {
+            if !crate::ui::TaskNotifier::global().is_active() {
+                crate::ui::send_desktop_notification(
+                    "󰂯",
+                    "Bluetooth",
+                    &format!("Bluetooth power set to {clean_action}"),
+                    2500,
+                    "low",
+                )
+                .await;
+            }
             Ok(format!("Bluetooth power set to {clean_action}."))
         }
     }
@@ -89,6 +157,16 @@ impl SystemPowerManager {
         if out.is_empty() {
             Ok("Speedtest completed.".to_string())
         } else {
+            if !crate::ui::TaskNotifier::global().is_active() {
+                crate::ui::send_desktop_notification(
+                    "󰛳",
+                    "Speedtest Results",
+                    &format!("{clean_dir}: {out}"),
+                    4000,
+                    "normal",
+                )
+                .await;
+            }
             Ok(format!("Network speedtest ({clean_dir}): {out}"))
         }
     }
