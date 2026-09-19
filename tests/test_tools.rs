@@ -1,33 +1,74 @@
 use chrono::{Datelike, Timelike};
 use jarvis::core::config::Settings;
-use jarvis::tools::calendar::CalendarManager;
 use jarvis::tools::build_tool_registry;
+use jarvis::tools::calendar::CalendarManager;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[test]
-fn test_all_51_tools_registered() {
+fn test_all_55_tools_registered() {
     let settings = Settings::default();
     let flag = Arc::new(AtomicBool::new(false));
     let reg = build_tool_registry(&settings, flag);
 
-    assert_eq!(reg.count(), 51);
+    assert_eq!(reg.count(), 55);
 
     let tools = [
-        "switch_workspace", "focus_application", "close_active_window",
-        "toggle_layout_split", "toggle_fullscreen", "adjust_volume",
-        "set_brightness", "set_theme", "get_battery", "launch_application",
-        "notify", "type_text", "press_key", "send_shortcut", "scroll",
-        "execute_command", "media_play_pause", "media_next", "media_previous",
-        "media_stop", "get_now_playing", "get_clipboard", "set_clipboard",
-        "lock_screen", "logout_system", "reboot_system", "shutdown_system",
-        "toggle_bluetooth", "get_system_stats", "network_speedtest",
-        "launch_workflow", "list_workflows", "capture_current_workflow",
-        "save_custom_workflow", "delete_custom_workflow", "get_workflow_details",
-        "open_url", "search_web", "open_youtube", "inspect_screen",
-        "schedule_event", "set_reminder", "list_reminders", "clear_reminders",
-        "draft_email", "create_note", "list_notes", "create_project",
-        "delegate_to_antigravity", "open_file_in_editor", "dismiss_session",
+        "switch_workspace",
+        "focus_application",
+        "close_active_window",
+        "toggle_layout_split",
+        "toggle_fullscreen",
+        "adjust_volume",
+        "set_brightness",
+        "set_theme",
+        "get_battery",
+        "launch_application",
+        "notify",
+        "type_text",
+        "press_key",
+        "send_shortcut",
+        "scroll",
+        "execute_command",
+        "media_play_pause",
+        "media_next",
+        "media_previous",
+        "media_stop",
+        "get_now_playing",
+        "play_media",
+        "resume_media",
+        "get_clipboard",
+        "set_clipboard",
+        "lock_screen",
+        "logout_system",
+        "reboot_system",
+        "shutdown_system",
+        "toggle_bluetooth",
+        "get_system_stats",
+        "network_speedtest",
+        "launch_workflow",
+        "list_workflows",
+        "capture_current_workflow",
+        "save_custom_workflow",
+        "delete_custom_workflow",
+        "get_workflow_details",
+        "open_url",
+        "search_web",
+        "open_youtube",
+        "inspect_screen",
+        "schedule_event",
+        "set_reminder",
+        "list_reminders",
+        "clear_reminders",
+        "draft_email",
+        "create_note",
+        "list_notes",
+        "create_project",
+        "delegate_to_antigravity",
+        "open_file_in_editor",
+        "localsend_share",
+        "display_research_in_neovim",
+        "dismiss_session",
     ];
 
     for t in tools {
@@ -45,9 +86,15 @@ async fn test_dismiss_session_tool() {
     let reg = build_tool_registry(&settings, flag.clone());
 
     assert!(!flag.load(Ordering::SeqCst));
-    let result = reg.execute_tool("dismiss_session", serde_json::json!({
-        "farewell": "Goodbye!"
-    })).await.unwrap();
+    let result = reg
+        .execute_tool(
+            "dismiss_session",
+            serde_json::json!({
+                "farewell": "Goodbye!"
+            }),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result, "Goodbye!");
     assert!(flag.load(Ordering::SeqCst));
@@ -68,4 +115,40 @@ fn test_calendar_date_parsing() {
     assert_eq!(dt3.date().month(), 12);
     assert_eq!(dt3.date().day(), 25);
     assert_eq!(dt3.time().hour(), 18);
+}
+
+#[tokio::test]
+async fn test_localsend_share_tool_url() {
+    let flag = Arc::new(AtomicBool::new(false));
+    let settings = Settings::default();
+    let reg = build_tool_registry(&settings, flag);
+
+    let res = reg
+        .execute_tool(
+            "localsend_share",
+            serde_json::json!({
+                "item": "https://github.com/localsend/localsend"
+            }),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    let msg = res.unwrap();
+    assert!(msg.contains("LocalSend sending window"));
+}
+
+#[tokio::test]
+async fn test_display_research_in_neovim_tool() {
+    let flag = Arc::new(AtomicBool::new(false));
+    let settings = Settings::default();
+    let reg = build_tool_registry(&settings, flag);
+
+    let res = reg.execute_tool("display_research_in_neovim", serde_json::json!({
+        "title": "Quantum Computing",
+        "content": "## Quantum Superposition\nQubits can exist in coherent superpositions of states."
+    })).await;
+
+    assert!(res.is_ok());
+    let msg = res.unwrap();
+    assert!(msg.contains("Quantum Computing"));
 }

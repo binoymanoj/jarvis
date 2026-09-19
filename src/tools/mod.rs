@@ -4,10 +4,12 @@ pub mod coding_cli;
 pub mod editor;
 pub mod email;
 pub mod hyprland;
+pub mod localsend;
 pub mod media;
 pub mod notes;
 pub mod omarchy;
 pub mod power;
+pub mod research;
 pub mod screen;
 pub mod shell;
 pub mod virtual_input;
@@ -135,7 +137,9 @@ impl ToolRegistry {
     }
 
     pub async fn execute_tool(&self, name: &str, args: Value) -> Result<String> {
-        let tool = self.get(name).ok_or_else(|| JarvisError::ToolNotFound(name.to_string()))?;
+        let tool = self
+            .get(name)
+            .ok_or_else(|| JarvisError::ToolNotFound(name.to_string()))?;
         tool.execute(args).await
     }
 }
@@ -147,7 +151,10 @@ impl Default for ToolRegistry {
 }
 
 /// Builds the default complete tool registry containing all 48+ desktop tools
-pub fn build_tool_registry(settings: &Settings, session_ended_flag: Arc<AtomicBool>) -> ToolRegistry {
+pub fn build_tool_registry(
+    settings: &Settings,
+    session_ended_flag: Arc<AtomicBool>,
+) -> ToolRegistry {
     let mut reg = ToolRegistry::new();
 
     // 1. Core controllers
@@ -155,23 +162,35 @@ pub fn build_tool_registry(settings: &Settings, session_ended_flag: Arc<AtomicBo
     let omarchy = Arc::new(omarchy::OmarchyBridge::new());
     let virtual_input = Arc::new(virtual_input::VirtualInputManager::new());
     let shell = Arc::new(shell::ShellExecutor::default());
-    let media = Arc::new(media::MediaManager::new());
+    let media = Arc::new(media::MediaManager::with_settings(
+        settings.resolved_media_dirs(),
+        &settings.media_player,
+    ));
     let clipboard = Arc::new(clipboard::ClipboardManager::new());
-    let power = Arc::new(power::SystemPowerManager::new(omarchy.clone()));
-    let workflow = Arc::new(workflow::WorkflowManager::new(hyprland.clone()));
+    let power = Arc::new(power::SystemPowerManager::new(
+        omarchy.clone(),
+        settings.clone(),
+    ));
+    let workflow = Arc::new(workflow::WorkflowManager::with_settings(
+        hyprland.clone(),
+        Some(settings.clone()),
+    ));
     let web = Arc::new(web::WebNavigator::new());
     let screen = Arc::new(screen::ScreenPerception::new(hyprland.clone()));
     let calendar = Arc::new(calendar::CalendarManager::new());
     let notes = Arc::new(notes::NoteManager::new());
     let email = Arc::new(email::EmailManager::new());
-    let coding_cli = Arc::new(coding_cli::CodingCLIManager::new(&settings.cli_ai_tool, omarchy.clone()));
+    let coding_cli = Arc::new(coding_cli::CodingCLIManager::new(
+        &settings.cli_ai_tool,
+        omarchy.clone(),
+    ));
 
     // 2. Register Hyprland Tools (5)
     reg.register(hyprland::SwitchWorkspaceTool::new(hyprland.clone()));
     reg.register(hyprland::FocusApplicationTool::new(hyprland.clone()));
     reg.register(hyprland::CloseActiveWindowTool::new(hyprland.clone()));
     reg.register(hyprland::ToggleLayoutSplitTool::new(hyprland.clone()));
-    reg.register(hyprland::ToggleFullscreenTool::new(hyprland));
+    reg.register(hyprland::ToggleFullscreenTool::new(hyprland.clone()));
 
     // 3. Register Omarchy Tools (6)
     reg.register(omarchy::AdjustVolumeTool::new(omarchy.clone()));
@@ -190,12 +209,14 @@ pub fn build_tool_registry(settings: &Settings, session_ended_flag: Arc<AtomicBo
     // 5. Register Shell Executor Tool (1)
     reg.register(shell::ExecuteCommandTool::new(shell));
 
-    // 6. Register Media Player Tools (5)
+    // 6. Register Media Player & Video Tools (7)
     reg.register(media::MediaPlayPauseTool::new(media.clone()));
     reg.register(media::MediaNextTool::new(media.clone()));
     reg.register(media::MediaPreviousTool::new(media.clone()));
     reg.register(media::MediaStopTool::new(media.clone()));
-    reg.register(media::GetNowPlayingTool::new(media));
+    reg.register(media::GetNowPlayingTool::new(media.clone()));
+    reg.register(media::PlayMediaTool::new(media.clone()));
+    reg.register(media::ResumeMediaTool::new(media));
 
     // 7. Register Clipboard Tools (2)
     reg.register(clipboard::GetClipboardTool::new(clipboard.clone()));
@@ -244,9 +265,24 @@ pub fn build_tool_registry(settings: &Settings, session_ended_flag: Arc<AtomicBo
     reg.register(coding_cli::DelegateToAntigravityTool::new(coding_cli));
 
     // 16. Register Editor Tools (1)
-    reg.register(editor::OpenFileInEditorTool::new(&settings.editor, &settings.terminal, &settings.project_dirs));
+    reg.register(editor::OpenFileInEditorTool::new(
+        &settings.editor,
+        &settings.terminal,
+        &settings.project_dirs,
+    ));
 
-    // 17. Dismiss Session Tool (1)
+    // 17. Register LocalSend Tools (1)
+    let localsend = Arc::new(localsend::LocalSendManager::new(
+        hyprland.clone(),
+        settings.resolved_media_dirs(),
+    ));
+    reg.register(localsend::LocalSendShareTool::new(localsend));
+
+    // 18. Register Research & Neovim Markdown Tools (1)
+    let research = Arc::new(research::ResearchManager::new());
+    reg.register(research::DisplayResearchInNeovimTool::new(research));
+
+    // 19. Dismiss Session Tool (1)
     reg.register(DismissSessionTool::new(session_ended_flag));
 
     reg
@@ -262,14 +298,18 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let registry = build_tool_registry(&settings, flag);
 
-        // All 51 native tools must be successfully registered!
-        assert_eq!(registry.count(), 51);
+        // All 55 native tools must be successfully registered!
+        assert_eq!(registry.count(), 55);
 
         // Ensure key tools are retrievable
         assert!(registry.get("switch_workspace").is_some());
         assert!(registry.get("focus_application").is_some());
         assert!(registry.get("execute_command").is_some());
         assert!(registry.get("media_play_pause").is_some());
+        assert!(registry.get("play_media").is_some());
+        assert!(registry.get("resume_media").is_some());
+        assert!(registry.get("localsend_share").is_some());
+        assert!(registry.get("display_research_in_neovim").is_some());
         assert!(registry.get("launch_workflow").is_some());
         assert!(registry.get("create_project").is_some());
         assert!(registry.get("open_file_in_editor").is_some());
@@ -279,6 +319,6 @@ mod tests {
         let decls = registry.gemini_function_declarations();
         assert!(decls.is_array());
         let list = decls[0]["functionDeclarations"].as_array().unwrap();
-        assert_eq!(list.len(), 51);
+        assert_eq!(list.len(), 55);
     }
 }
