@@ -49,8 +49,9 @@ impl CodingCLIManager {
                 .unwrap_or_else(|_| PathBuf::from(&home).join(".local/bin/claude")),
             "codex" => which::which("codex")
                 .unwrap_or_else(|_| PathBuf::from(&home).join(".local/share/mise/shims/codex")),
-            _ => which::which("agy")
-                .unwrap_or_else(|_| PathBuf::from(&home).join(".local/bin/agy")),
+            _ => {
+                which::which("agy").unwrap_or_else(|_| PathBuf::from(&home).join(".local/bin/agy"))
+            }
         }
     }
 
@@ -60,7 +61,11 @@ impl CodingCLIManager {
 
         let re = Regex::new(r"[^\w.-]").unwrap();
         let clean_name = re.replace_all(name.trim(), "_").to_string();
-        let final_name = if clean_name.is_empty() { "new_project".to_string() } else { clean_name };
+        let final_name = if clean_name.is_empty() {
+            "new_project".to_string()
+        } else {
+            clean_name
+        };
 
         if let Some(raw) = requested_dir {
             let trimmed = raw.trim();
@@ -98,7 +103,11 @@ impl CodingCLIManager {
         target_path: &Path,
         project_type: &str,
     ) -> String {
-        let type_str = if project_type.trim().is_empty() { "project" } else { project_type.trim() };
+        let type_str = if project_type.trim().is_empty() {
+            "project"
+        } else {
+            project_type.trim()
+        };
         let desc_str = if description.trim().is_empty() {
             format!("Initialize a complete {type_str} named {name}.")
         } else {
@@ -118,7 +127,12 @@ impl CodingCLIManager {
         )
     }
 
-    pub async fn launch_popup_terminal(&self, cwd: &Path, prompt: &str, title: &str) -> Result<bool> {
+    pub async fn launch_popup_terminal(
+        &self,
+        cwd: &Path,
+        prompt: &str,
+        title: &str,
+    ) -> Result<bool> {
         let _ = fs::create_dir_all(cwd);
         let bin = self.get_binary_path();
         let bin_str = bin.to_string_lossy();
@@ -199,14 +213,19 @@ impl CodingCLIManager {
         let prompt = self.build_scaffold_prompt(name, description, &target_path, project_type);
         let tool_label = self.display_name();
 
-        info!("Creating {project_type} '{name}' at {:?} via {tool_label}", target_path);
+        info!(
+            "Creating {project_type} '{name}' at {:?} via {tool_label}",
+            target_path
+        );
 
         if open_terminal {
-            let launched = self.launch_popup_terminal(
-                &target_path,
-                &prompt,
-                &format!("Jarvis - {tool_label} ({name})"),
-            ).await?;
+            let launched = self
+                .launch_popup_terminal(
+                    &target_path,
+                    &prompt,
+                    &format!("Jarvis - {tool_label} ({name})"),
+                )
+                .await?;
 
             if launched {
                 return Ok(format!(
@@ -248,7 +267,14 @@ impl CodingCLIManager {
         target_dir: Option<&str>,
         open_terminal: bool,
     ) -> Result<String> {
-        self.create_project("autonomous_task", task_description, target_dir, "task", open_terminal).await
+        self.create_project(
+            "autonomous_task",
+            task_description,
+            target_dir,
+            "task",
+            open_terminal,
+        )
+        .await
     }
 }
 
@@ -306,9 +332,9 @@ impl Tool for CreateProjectTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("create_project".into(), "name string is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("create_project".into(), "name string is required".into())
+        })?;
         let description = args["description"].as_str().unwrap_or("");
         let target_dir = args["target_dir"].as_str();
         let project_type = args["project_type"].as_str().unwrap_or("project");
@@ -362,9 +388,12 @@ impl Tool for DelegateToAntigravityTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let task_description = args["task_description"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("delegate_to_antigravity".into(), "task_description is required".into()))?;
+        let task_description = args["task_description"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "delegate_to_antigravity".into(),
+                "task_description is required".into(),
+            )
+        })?;
         let target_dir = args["target_dir"].as_str();
         let open_terminal = args["open_terminal"].as_bool().unwrap_or(false);
 

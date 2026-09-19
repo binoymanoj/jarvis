@@ -119,7 +119,8 @@ impl AudioRecorder {
                 let frame: Vec<i16> = vad_buffer.drain(..512).collect();
                 let vad_prob = vad.get_speech_prob(&frame);
                 let chunk_rms = AudioCapture::compute_rms(&frame) / 32768.0;
-                let is_real_speech = vad_prob >= self.vad_threshold && chunk_rms >= self.energy_threshold;
+                let is_real_speech =
+                    vad_prob >= self.vad_threshold && chunk_rms >= self.energy_threshold;
 
                 if is_real_speech {
                     consecutive_speech_chunks += 1;
@@ -133,7 +134,10 @@ impl AudioRecorder {
                     if speech_started {
                         consecutive_silence_chunks += 1;
                         if consecutive_silence_chunks >= self.silence_chunks_limit {
-                            info!("Natural pause detected (~{:.2}s). Submitting phrase.", self.silence_timeout_secs);
+                            info!(
+                                "Natural pause detected (~{:.2}s). Submitting phrase.",
+                                self.silence_timeout_secs
+                            );
                             break;
                         }
                     }
@@ -151,7 +155,10 @@ impl AudioRecorder {
             }
 
             if elapsed >= max_duration {
-                info!("Reached maximum recording duration ({}s).", self.max_duration_secs);
+                info!(
+                    "Reached maximum recording duration ({}s).",
+                    self.max_duration_secs
+                );
                 break;
             }
         }
@@ -162,7 +169,10 @@ impl AudioRecorder {
             if recorded_samples.len() >= 16000 * 35 / 100 && total_rms > 30.0 {
                 info!("Audible sound detected in recording (RMS {:.1}, {} samples). Sending to transcription.", total_rms, recorded_samples.len());
             } else {
-                debug!("No speech detected in audio stream (RMS {:.1}). Discarding.", total_rms);
+                debug!(
+                    "No speech detected in audio stream (RMS {:.1}). Discarding.",
+                    total_rms
+                );
                 return Ok(Vec::new());
             }
         }
@@ -189,7 +199,8 @@ impl AudioRecorder {
         for sample in recorded_samples {
             writer.write_sample(sample).unwrap();
         }
-        writer.finalize()
+        writer
+            .finalize()
             .map_err(|e| JarvisError::Audio(format!("Failed to finalize WAV: {e}")))?;
 
         Ok(cursor.into_inner())

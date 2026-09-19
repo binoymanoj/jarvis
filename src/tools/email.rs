@@ -71,7 +71,8 @@ impl EmailManager {
         // Option 2: Native Thunderbird CLI
         if let Some(ref tb) = self.thunderbird_bin {
             if client.eq_ignore_ascii_case("auto") || client.eq_ignore_ascii_case("thunderbird") {
-                let compose_args = format!("to='{clean_to}',subject='{clean_su}',body='{clean_body}'");
+                let compose_args =
+                    format!("to='{clean_to}',subject='{clean_su}',body='{clean_body}'");
                 let status = Command::new(tb)
                     .arg("-compose")
                     .arg(&compose_args)
@@ -159,17 +160,19 @@ impl Tool for DraftEmailTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let recipient = args["recipient"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("draft_email".into(), "recipient string is required".into()))?;
-        let subject = args["subject"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("draft_email".into(), "subject string is required".into()))?;
-        let body = args["body"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("draft_email".into(), "body string is required".into()))?;
+        let recipient = args["recipient"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("draft_email".into(), "recipient string is required".into())
+        })?;
+        let subject = args["subject"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("draft_email".into(), "subject string is required".into())
+        })?;
+        let body = args["body"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("draft_email".into(), "body string is required".into())
+        })?;
         let client = args["client"].as_str().unwrap_or("auto");
 
-        self.email.draft_email(recipient, subject, body, client).await
+        self.email
+            .draft_email(recipient, subject, body, client)
+            .await
     }
 }

@@ -31,7 +31,9 @@ impl SileroVAD {
                 b = b.with_intra_op_spinning(false).ok()?;
                 b = b.with_inter_op_spinning(false).ok()?;
                 b = b.with_parallel_execution(false).ok()?;
-                b = b.with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1).ok()?;
+                b = b
+                    .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level1)
+                    .ok()?;
                 b.commit_from_file(path).ok()
             })();
             match res {
@@ -45,7 +47,10 @@ impl SileroVAD {
                 }
             }
         } else {
-            warn!("Silero VAD model not found at {:?}, using energy fallback", path);
+            warn!(
+                "Silero VAD model not found at {:?}, using energy fallback",
+                path
+            );
             None
         };
 
@@ -80,7 +85,11 @@ impl SileroVAD {
             Some(s) => s,
             None => {
                 // If model is not loaded, pure energy threshold fallback
-                return if rms >= self.energy_threshold * 2.5 { 0.8 } else { 0.0 };
+                return if rms >= self.energy_threshold * 2.5 {
+                    0.8
+                } else {
+                    0.0
+                };
             }
         };
 
@@ -135,7 +144,11 @@ impl SileroVAD {
         }
 
         // Fallback to RMS score if tensor execution fails
-        if rms >= self.energy_threshold * 2.0 { 0.7 } else { 0.0 }
+        if rms >= self.energy_threshold * 2.0 {
+            0.7
+        } else {
+            0.0
+        }
     }
 
     pub fn is_speech(&mut self, chunk: &[i16], threshold: f32) -> bool {

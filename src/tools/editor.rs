@@ -90,7 +90,10 @@ impl OpenFileInEditorTool {
                             let norm_dir = dir_name.replace(['-', '_', ' '], "");
                             for c in &candidates {
                                 let norm_c = c.replace(['-', '_', ' '], "");
-                                if norm_dir == norm_c || norm_dir.contains(&norm_c) || norm_c.contains(&norm_dir) {
+                                if norm_dir == norm_c
+                                    || norm_dir.contains(&norm_c)
+                                    || norm_c.contains(&norm_dir)
+                                {
                                     return Some(entry.path());
                                 }
                             }
@@ -156,19 +159,29 @@ impl OpenFileInEditorTool {
     }
 
     /// Launch the editor in terminal or GUI
-    pub async fn launch_editor(&self, project_dir: &Path, file_path: &Path, editor: &str) -> Result<String> {
+    pub async fn launch_editor(
+        &self,
+        project_dir: &Path,
+        file_path: &Path,
+        editor: &str,
+    ) -> Result<String> {
         let editor_cmd = editor.to_lowercase();
         let file_str = file_path.to_string_lossy().to_string();
         let project_str = project_dir.to_string_lossy().to_string();
 
-        info!("Opening '{}' in editor '{}' (cwd: {})", file_str, editor_cmd, project_str);
+        info!(
+            "Opening '{}' in editor '{}' (cwd: {})",
+            file_str, editor_cmd, project_str
+        );
 
         match editor_cmd.as_str() {
             "code" | "vscode" | "cursor" => {
                 let mut cmd = Command::new(&editor_cmd);
                 cmd.arg(&file_str);
                 cmd.stdout(Stdio::null()).stderr(Stdio::null());
-                cmd.spawn().map_err(|e| JarvisError::Other(format!("Failed to spawn {editor_cmd}: {e}")))?;
+                cmd.spawn().map_err(|e| {
+                    JarvisError::Other(format!("Failed to spawn {editor_cmd}: {e}"))
+                })?;
             }
             _ => {
                 let bin = match editor_cmd.as_str() {
@@ -193,7 +206,10 @@ impl OpenFileInEditorTool {
                     .args([
                         "dispatch",
                         "exec",
-                        &format!("{} -d {} -e {} {}", terminal_bin, project_str, bin, file_str),
+                        &format!(
+                            "{} -d {} -e {} {}",
+                            terminal_bin, project_str, bin, file_str
+                        ),
                     ])
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
@@ -208,12 +224,18 @@ impl OpenFileInEditorTool {
                         .arg(bin)
                         .arg(&file_str);
                     cmd.stdout(Stdio::null()).stderr(Stdio::null());
-                    cmd.spawn().map_err(|e| JarvisError::Other(format!("Failed to launch terminal editor: {e}")))?;
+                    cmd.spawn().map_err(|e| {
+                        JarvisError::Other(format!("Failed to launch terminal editor: {e}"))
+                    })?;
                 }
             }
         }
 
-        Ok(format!("Opened {} in {}.", file_path.file_name().unwrap_or_default().to_string_lossy(), editor_cmd))
+        Ok(format!(
+            "Opened {} in {}.",
+            file_path.file_name().unwrap_or_default().to_string_lossy(),
+            editor_cmd
+        ))
     }
 }
 
@@ -249,39 +271,44 @@ impl Tool for OpenFileInEditorTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let project_name = args["project_name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("open_file_in_editor".into(), "project_name is required".into()))?;
-        let file_path = args["file_path"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("open_file_in_editor".into(), "file_path is required".into()))?;
-        let editor = args["editor"]
-            .as_str()
-            .unwrap_or(&self.default_editor);
-
-        debug!("Resolving project '{}' for file '{}'...", project_name, file_path);
-
-        let project_dir = self.find_project_dir(project_name).ok_or_else(|| {
-            JarvisError::ToolExecution {
-                tool: "open_file_in_editor".to_string(),
-                message: format!(
-                    "Could not find project directory for '{}' in configured code paths.",
-                    project_name
-                ),
-            }
+        let project_name = args["project_name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "open_file_in_editor".into(),
+                "project_name is required".into(),
+            )
         })?;
+        let file_path = args["file_path"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("open_file_in_editor".into(), "file_path is required".into())
+        })?;
+        let editor = args["editor"].as_str().unwrap_or(&self.default_editor);
 
-        let resolved_file = self.find_file_in_dir(&project_dir, file_path).ok_or_else(|| {
-            JarvisError::ToolExecution {
+        debug!(
+            "Resolving project '{}' for file '{}'...",
+            project_name, file_path
+        );
+
+        let project_dir =
+            self.find_project_dir(project_name)
+                .ok_or_else(|| JarvisError::ToolExecution {
+                    tool: "open_file_in_editor".to_string(),
+                    message: format!(
+                        "Could not find project directory for '{}' in configured code paths.",
+                        project_name
+                    ),
+                })?;
+
+        let resolved_file = self
+            .find_file_in_dir(&project_dir, file_path)
+            .ok_or_else(|| JarvisError::ToolExecution {
                 tool: "open_file_in_editor".to_string(),
                 message: format!(
                     "Could not find file '{}' inside project '{}' at {:?}.",
                     file_path, project_name, project_dir
                 ),
-            }
-        })?;
+            })?;
 
-        self.launch_editor(&project_dir, &resolved_file, editor).await
+        self.launch_editor(&project_dir, &resolved_file, editor)
+            .await
     }
 }
 
@@ -291,14 +318,21 @@ mod tests {
 
     #[test]
     fn test_find_project_dir_and_file() {
-        let tool = OpenFileInEditorTool::new("nvim", "kitty", &["/home/binoy/Codes/personal".to_string()]);
+        let tool =
+            OpenFileInEditorTool::new("nvim", "kitty", &["/home/binoy/Codes/personal".to_string()]);
         let proj = tool.find_project_dir("tracky researcher tui");
-        assert!(proj.is_some(), "Should find tracky-researcher-tui directory");
+        assert!(
+            proj.is_some(),
+            "Should find tracky-researcher-tui directory"
+        );
         let proj_path = proj.unwrap();
         assert!(proj_path.exists());
 
         let file = tool.find_file_in_dir(&proj_path, "models.go");
-        assert!(file.is_some(), "Should find models.go recursively inside project");
+        assert!(
+            file.is_some(),
+            "Should find models.go recursively inside project"
+        );
         let file_path = file.unwrap();
         assert!(file_path.ends_with("internal/models/models.go"));
     }

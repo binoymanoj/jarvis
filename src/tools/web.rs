@@ -103,7 +103,10 @@ impl WebNavigator {
 
         if let Some(caps) = re.captures(&html) {
             let id = caps.get(1).map(|m| m.as_str().to_string())?;
-            let title = caps.get(2).map(|m| m.as_str().to_string()).unwrap_or_else(|| query.to_string());
+            let title = caps
+                .get(2)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_else(|| query.to_string());
             return Some((id, title));
         }
 
@@ -155,9 +158,9 @@ impl Tool for OpenUrlTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let url = args["url"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("open_url".into(), "url string is required".into()))?;
+        let url = args["url"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("open_url".into(), "url string is required".into())
+        })?;
 
         self.web.open_url(url).await
     }
@@ -197,9 +200,9 @@ impl Tool for SearchWebTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let query = args["query"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("search_web".into(), "query string is required".into()))?;
+        let query = args["query"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("search_web".into(), "query string is required".into())
+        })?;
 
         self.web.search_web(query).await
     }
@@ -239,9 +242,9 @@ impl Tool for OpenYoutubeTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let query = args["query"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("open_youtube".into(), "query string is required".into()))?;
+        let query = args["query"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("open_youtube".into(), "query string is required".into())
+        })?;
 
         self.web.open_youtube(query).await
     }

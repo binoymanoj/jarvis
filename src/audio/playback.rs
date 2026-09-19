@@ -27,8 +27,9 @@ fn generate_chime_wav(path: &PathBuf) -> Result<()> {
         sample_format: hound::SampleFormat::Int,
     };
 
-    let mut writer = WavWriter::create(path, spec)
-        .map_err(|e| crate::core::error::JarvisError::Audio(format!("Failed to create chime: {e}")))?;
+    let mut writer = WavWriter::create(path, spec).map_err(|e| {
+        crate::core::error::JarvisError::Audio(format!("Failed to create chime: {e}"))
+    })?;
 
     let sr = 24000.0f32;
     let n1 = (sr * 0.06) as usize;
@@ -52,8 +53,9 @@ fn generate_chime_wav(path: &PathBuf) -> Result<()> {
         writer.write_sample(int_sample).unwrap();
     }
 
-    writer.finalize()
-        .map_err(|e| crate::core::error::JarvisError::Audio(format!("Failed to finalize chime: {e}")))?;
+    writer.finalize().map_err(|e| {
+        crate::core::error::JarvisError::Audio(format!("Failed to finalize chime: {e}"))
+    })?;
 
     Ok(())
 }

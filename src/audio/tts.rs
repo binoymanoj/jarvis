@@ -70,11 +70,12 @@ impl TextToSpeech {
         info!("Jarvis Speaking: \"{clean}\"");
         self.is_speaking.store(true, Ordering::SeqCst);
 
-        let res = if self.engine == "piper" && self.piper_bin.is_some() && self.piper_model.is_file() {
-            self.speak_piper(clean).await
-        } else {
-            self.speak_edge(clean).await
-        };
+        let res =
+            if self.engine == "piper" && self.piper_bin.is_some() && self.piper_model.is_file() {
+                self.speak_piper(clean).await
+            } else {
+                self.speak_edge(clean).await
+            };
 
         self.is_speaking.store(false, Ordering::SeqCst);
         res

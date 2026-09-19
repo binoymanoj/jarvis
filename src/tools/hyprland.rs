@@ -38,13 +38,14 @@ impl HyprlandController {
     }
 
     pub async fn send_request(&self, payload: &[u8]) -> Result<String> {
-        let socket_path = self
-            .cmd_socket_path
-            .as_ref()
-            .ok_or_else(|| JarvisError::ToolExecution {
-                tool: "hyprland".to_string(),
-                message: "HYPRLAND_INSTANCE_SIGNATURE environment variable is not set.".to_string(),
-            })?;
+        let socket_path =
+            self.cmd_socket_path
+                .as_ref()
+                .ok_or_else(|| JarvisError::ToolExecution {
+                    tool: "hyprland".to_string(),
+                    message: "HYPRLAND_INSTANCE_SIGNATURE environment variable is not set."
+                        .to_string(),
+                })?;
 
         if !socket_path.exists() {
             return Err(JarvisError::Socket {
@@ -163,8 +164,12 @@ impl HyprlandController {
             .output()
             .await?;
 
-        let stdout = String::from_utf8_lossy(&raw_output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&raw_output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&raw_output.stdout)
+            .trim()
+            .to_string();
+        let stderr = String::from_utf8_lossy(&raw_output.stderr)
+            .trim()
+            .to_string();
         if !stdout.is_empty() {
             Ok(stdout)
         } else {
@@ -195,7 +200,10 @@ impl HyprlandController {
                 let c_title = client["title"].as_str().unwrap_or("").to_lowercase();
                 let c_initial = client["initialClass"].as_str().unwrap_or("").to_lowercase();
 
-                if c_class.contains(&query) || c_title.contains(&query) || c_initial.contains(&query) {
+                if c_class.contains(&query)
+                    || c_title.contains(&query)
+                    || c_initial.contains(&query)
+                {
                     if let Some(addr) = client["address"].as_str() {
                         self.focus_window(addr).await?;
                         return Ok(true);
@@ -218,7 +226,11 @@ impl HyprlandController {
         self.dispatch("fullscreen").await
     }
 
-    pub async fn move_window_to_workspace(&self, workspace_id: i32, silent: bool) -> Result<String> {
+    pub async fn move_window_to_workspace(
+        &self,
+        workspace_id: i32,
+        silent: bool,
+    ) -> Result<String> {
         let cmd = if silent {
             format!("movetoworkspacesilent {workspace_id}")
         } else {
@@ -266,9 +278,12 @@ impl Tool for SwitchWorkspaceTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let workspace_id = args["workspace_id"]
-            .as_i64()
-            .ok_or_else(|| JarvisError::ToolParameter("switch_workspace".into(), "workspace_id integer is required".into()))? as i32;
+        let workspace_id = args["workspace_id"].as_i64().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "switch_workspace".into(),
+                "workspace_id integer is required".into(),
+            )
+        })? as i32;
 
         self.hyprland.change_workspace(workspace_id).await?;
         Ok(format!("Switched to workspace {workspace_id}."))
@@ -309,15 +324,20 @@ impl Tool for FocusApplicationTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let app_name = args["app_name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("focus_application".into(), "app_name string is required".into()))?;
+        let app_name = args["app_name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "focus_application".into(),
+                "app_name string is required".into(),
+            )
+        })?;
 
         let found = self.hyprland.focus_app(app_name).await?;
         if found {
             Ok(format!("Focused {app_name}."))
         } else {
-            Ok(format!("Could not find open application matching '{app_name}'."))
+            Ok(format!(
+                "Could not find open application matching '{app_name}'."
+            ))
         }
     }
 }

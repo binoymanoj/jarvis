@@ -21,8 +21,8 @@ impl Default for OmarchyBridge {
 
 impl OmarchyBridge {
     pub fn new() -> Self {
-        let omarchy_bin = which::which("omarchy")
-            .unwrap_or_else(|_| PathBuf::from("/usr/bin/omarchy"));
+        let omarchy_bin =
+            which::which("omarchy").unwrap_or_else(|_| PathBuf::from("/usr/bin/omarchy"));
 
         let notify_bin = which::which("omarchy-notification-send")
             .unwrap_or_else(|_| PathBuf::from("/usr/share/omarchy/bin/omarchy-notification-send"));
@@ -63,8 +63,10 @@ impl OmarchyBridge {
         urgency: &str,
     ) -> Result<bool> {
         let mut cmd = Command::new(&self.notify_bin);
-        cmd.arg("-g").arg(glyph)
-            .arg("-u").arg(urgency)
+        cmd.arg("-g")
+            .arg(glyph)
+            .arg("-u")
+            .arg(urgency)
             .arg(headline);
 
         if !description.is_empty() {
@@ -97,7 +99,11 @@ impl OmarchyBridge {
 
     pub async fn list_themes(&self) -> Result<Vec<String>> {
         let out = self.run("theme list", &[]).await?;
-        Ok(out.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect())
+        Ok(out
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect())
     }
 
     pub async fn get_battery_status(&self) -> Result<String> {
@@ -149,9 +155,12 @@ impl Tool for AdjustVolumeTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let adjustment = args["adjustment"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("adjust_volume".into(), "adjustment string is required".into()))?;
+        let adjustment = args["adjustment"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "adjust_volume".into(),
+                "adjustment string is required".into(),
+            )
+        })?;
 
         let out = self.omarchy.set_volume(adjustment).await?;
         Ok(format!("Volume adjusted: {out}"))
@@ -192,9 +201,9 @@ impl Tool for SetBrightnessTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let level = args["level"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("set_brightness".into(), "level string is required".into()))?;
+        let level = args["level"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("set_brightness".into(), "level string is required".into())
+        })?;
 
         let out = self.omarchy.set_brightness(level).await?;
         Ok(format!("Brightness updated: {out}"))
@@ -235,9 +244,9 @@ impl Tool for SetThemeTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let theme_name = args["theme_name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("set_theme".into(), "theme_name string is required".into()))?;
+        let theme_name = args["theme_name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("set_theme".into(), "theme_name string is required".into())
+        })?;
 
         let out = self.omarchy.set_theme(theme_name).await?;
         Ok(format!("Theme changed: {out}"))
@@ -310,9 +319,12 @@ impl Tool for LaunchApplicationTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let app_name = args["app_name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("launch_application".into(), "app_name string is required".into()))?;
+        let app_name = args["app_name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "launch_application".into(),
+                "app_name string is required".into(),
+            )
+        })?;
 
         self.omarchy.launch_app(app_name, &[]).await?;
         Ok(format!("Launched {app_name}."))
@@ -357,12 +369,14 @@ impl Tool for NotifyTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let headline = args["headline"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("notify".into(), "headline string is required".into()))?;
+        let headline = args["headline"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("notify".into(), "headline string is required".into())
+        })?;
         let description = args["description"].as_str().unwrap_or("");
 
-        self.omarchy.notify(headline, description, "󰚩", "normal").await?;
+        self.omarchy
+            .notify(headline, description, "󰚩", "normal")
+            .await?;
         Ok("Notification displayed.".to_string())
     }
 }

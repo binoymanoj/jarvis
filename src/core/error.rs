@@ -42,10 +42,7 @@ pub enum JarvisError {
     Tts(String),
 
     #[error("Tool execution failed [{tool}]: {message}")]
-    ToolExecution {
-        tool: String,
-        message: String,
-    },
+    ToolExecution { tool: String, message: String },
 
     #[error("Tool '{0}' not found in registry")]
     ToolNotFound(String),
@@ -63,10 +60,7 @@ pub enum JarvisError {
     Ipc(String),
 
     #[error("Socket error at {path}: {message}")]
-    Socket {
-        path: PathBuf,
-        message: String,
-    },
+    Socket { path: PathBuf, message: String },
 
     #[error("Dismissal / exit requested by user: {0}")]
     Exit(String),

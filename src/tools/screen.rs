@@ -141,9 +141,9 @@ impl Tool for InspectScreenTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let query = args["query"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("inspect_screen".into(), "query string is required".into()))?;
+        let query = args["query"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("inspect_screen".into(), "query string is required".into())
+        })?;
         let target = args["target"].as_str().unwrap_or("active_window");
 
         let img_path = if target == "fullscreen" {
@@ -154,6 +154,9 @@ impl Tool for InspectScreenTool {
 
         debug!("Captured screen image at: {:?}", img_path);
         // Returns the image path and status; the AI agent coordinator replaces this with multimodal vision payload
-        Ok(format!("[Screenshot captured at {:?}] User query: '{query}'", img_path))
+        Ok(format!(
+            "[Screenshot captured at {:?}] User query: '{query}'",
+            img_path
+        ))
     }
 }

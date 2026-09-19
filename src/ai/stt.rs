@@ -22,7 +22,10 @@ impl SpeechToText {
     }
 
     pub fn from_settings(settings: &Settings) -> Self {
-        Self::new(settings.groq_api_key.clone(), Some(settings.whisper_model.clone()))
+        Self::new(
+            settings.groq_api_key.clone(),
+            Some(settings.whisper_model.clone()),
+        )
     }
 
     /// Transcribe 16-bit mono WAV audio bytes to text via Groq Whisper API
@@ -36,7 +39,11 @@ impl SpeechToText {
             return Ok(String::new());
         }
 
-        info!("Transcribing {} bytes of audio via Groq ({})", wav_bytes.len(), self.model);
+        info!(
+            "Transcribing {} bytes of audio via Groq ({})",
+            wav_bytes.len(),
+            self.model
+        );
 
         let file_part = Part::bytes(wav_bytes.to_vec())
             .file_name("audio.wav")
@@ -61,7 +68,10 @@ impl SpeechToText {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            error!("Groq STT transcription failed with status {}: {}", status, body);
+            error!(
+                "Groq STT transcription failed with status {}: {}",
+                status, body
+            );
             return Err(JarvisError::ApiError { status, body });
         }
 

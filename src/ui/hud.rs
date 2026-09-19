@@ -74,7 +74,10 @@ impl JarvisHUD {
 
         // 2. Launch detached instance if shell.qml is found
         if !self.ui_path.join("shell.qml").is_file() {
-            debug!("Quickshell HUD shell.qml not found at {:?}, skipping HUD launch", self.ui_path);
+            debug!(
+                "Quickshell HUD shell.qml not found at {:?}, skipping HUD launch",
+                self.ui_path
+            );
             return false;
         }
 

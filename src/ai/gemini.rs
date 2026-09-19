@@ -104,12 +104,7 @@ impl GeminiClient {
 
         debug!("Sending Gemini generateContent request to model: {}", model);
 
-        let response = self
-            .client
-            .post(&url)
-            .json(request)
-            .send()
-            .await?;
+        let response = self.client.post(&url).json(request).send().await?;
 
         let status = response.status();
         let body_text = response.text().await.unwrap_or_default();
@@ -133,9 +128,8 @@ impl GeminiClient {
             });
         }
 
-        let parsed: GenerateContentResponse = serde_json::from_str(&body_text).map_err(|e| {
-            JarvisError::Serialization(e)
-        })?;
+        let parsed: GenerateContentResponse =
+            serde_json::from_str(&body_text).map_err(JarvisError::Serialization)?;
 
         if let Some(err) = &parsed.error {
             let status_code = err.status.as_deref().unwrap_or("");

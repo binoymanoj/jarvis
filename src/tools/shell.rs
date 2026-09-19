@@ -27,7 +27,11 @@ impl ShellExecutor {
         }
     }
 
-    pub async fn execute_command(&self, command: &str, custom_timeout: Option<f64>) -> Result<String> {
+    pub async fn execute_command(
+        &self,
+        command: &str,
+        custom_timeout: Option<f64>,
+    ) -> Result<String> {
         let trimmed = command.trim();
         if trimmed.is_empty() {
             return Ok("No command provided.".to_string());
@@ -37,7 +41,10 @@ impl ShellExecutor {
             .map(Duration::from_secs_f64)
             .unwrap_or(self.default_timeout);
 
-        debug!("Executing shell command (timeout={:?}): {}", run_timeout, trimmed);
+        debug!(
+            "Executing shell command (timeout={:?}): {}",
+            run_timeout, trimmed
+        );
 
         let mut child = Command::new("/bin/bash")
             .arg("-c")
@@ -82,7 +89,9 @@ impl ShellExecutor {
                     if status.success() {
                         return Ok("Command executed successfully (no output).".to_string());
                     } else {
-                        return Ok(format!("Command exited with return code {code} (no output)."));
+                        return Ok(format!(
+                            "Command exited with return code {code} (no output)."
+                        ));
                     }
                 }
 
@@ -103,7 +112,10 @@ impl ShellExecutor {
             Err(_) => {
                 let _ = child.kill().await;
                 warn!("Shell command timed out: {trimmed}");
-                Ok(format!("Command timed out after {} seconds.", run_timeout.as_secs()))
+                Ok(format!(
+                    "Command timed out after {} seconds.",
+                    run_timeout.as_secs()
+                ))
             }
         }
     }
@@ -151,9 +163,12 @@ impl Tool for ExecuteCommandTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let command = args["command"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("execute_command".into(), "command string is required".into()))?;
+        let command = args["command"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "execute_command".into(),
+                "command string is required".into(),
+            )
+        })?;
         let timeout_secs = args["timeout"].as_f64();
 
         self.executor.execute_command(command, timeout_secs).await
@@ -167,7 +182,10 @@ mod tests {
     #[tokio::test]
     async fn test_shell_executor_echo() {
         let executor = ShellExecutor::default();
-        let out = executor.execute_command("echo 'jarvis test'", None).await.unwrap();
+        let out = executor
+            .execute_command("echo 'jarvis test'", None)
+            .await
+            .unwrap();
         assert_eq!(out, "jarvis test");
     }
 

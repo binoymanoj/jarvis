@@ -189,9 +189,9 @@ impl Tool for TypeTextTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let text = args["text"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("type_text".into(), "text string is required".into()))?;
+        let text = args["text"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("type_text".into(), "text string is required".into())
+        })?;
         let enter_after = args["enter_after"].as_bool().unwrap_or(false);
 
         self.input.type_text(text, enter_after).await
@@ -232,9 +232,9 @@ impl Tool for PressKeyTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let key_name = args["key_name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("press_key".into(), "key_name string is required".into()))?;
+        let key_name = args["key_name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("press_key".into(), "key_name string is required".into())
+        })?;
 
         self.input.press_key(key_name).await
     }
@@ -278,12 +278,15 @@ impl Tool for SendShortcutTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let modifiers = args["modifiers"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("send_shortcut".into(), "modifiers string is required".into()))?;
-        let key = args["key"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("send_shortcut".into(), "key string is required".into()))?;
+        let modifiers = args["modifiers"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "send_shortcut".into(),
+                "modifiers string is required".into(),
+            )
+        })?;
+        let key = args["key"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("send_shortcut".into(), "key string is required".into())
+        })?;
 
         self.input.send_shortcut(modifiers, key).await
     }

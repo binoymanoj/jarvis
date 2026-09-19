@@ -1,6 +1,8 @@
+use crate::core::config::Settings;
 use crate::core::error::{JarvisError, Result};
 use crate::tools::hyprland::HyprlandController;
 use crate::tools::Tool;
+use crate::ui::confirmation::{request_confirmation, ConfirmationRequest};
 use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -46,10 +48,15 @@ pub struct WorkflowManager {
     hyprland: Arc<HyprlandController>,
     config_dir: PathBuf,
     workflows_file: PathBuf,
+    settings: Option<Settings>,
 }
 
 impl WorkflowManager {
     pub fn new(hyprland: Arc<HyprlandController>) -> Self {
+        Self::with_settings(hyprland, None)
+    }
+
+    pub fn with_settings(hyprland: Arc<HyprlandController>, settings: Option<Settings>) -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let config_dir = PathBuf::from(home).join(".config").join("jarvis");
         let workflows_file = config_dir.join("workflows.json");
@@ -57,6 +64,7 @@ impl WorkflowManager {
             hyprland,
             config_dir,
             workflows_file,
+            settings,
         };
         manager.ensure_config();
         manager
@@ -80,24 +88,44 @@ impl WorkflowManager {
         map.insert(
             "research".to_string(),
             WorkflowDef {
-                description: "Research environment: Browser on workspace 1, Obsidian notes on workspace 2".into(),
+                description:
+                    "Research environment: Browser on workspace 1, Obsidian notes on workspace 2"
+                        .into(),
                 aliases: vec!["study".into(), "reading".into()],
                 primary_workspace: 1,
                 steps: vec![
-                    WorkflowStep { workspace: 1, launch: "omarchy-launch-browser".into(), delay: 0.25 },
-                    WorkflowStep { workspace: 2, launch: "obsidian".into(), delay: 0.25 },
+                    WorkflowStep {
+                        workspace: 1,
+                        launch: "omarchy-launch-browser".into(),
+                        delay: 0.25,
+                    },
+                    WorkflowStep {
+                        workspace: 2,
+                        launch: "obsidian".into(),
+                        delay: 0.25,
+                    },
                 ],
             },
         );
         map.insert(
             "writing".to_string(),
             WorkflowDef {
-                description: "Writing environment: Obsidian notes on workspace 1, browser on workspace 2".into(),
+                description:
+                    "Writing environment: Obsidian notes on workspace 1, browser on workspace 2"
+                        .into(),
                 aliases: vec!["notes".into(), "write".into(), "drafting".into()],
                 primary_workspace: 1,
                 steps: vec![
-                    WorkflowStep { workspace: 1, launch: "obsidian".into(), delay: 0.25 },
-                    WorkflowStep { workspace: 2, launch: "omarchy-launch-browser".into(), delay: 0.25 },
+                    WorkflowStep {
+                        workspace: 1,
+                        launch: "obsidian".into(),
+                        delay: 0.25,
+                    },
+                    WorkflowStep {
+                        workspace: 2,
+                        launch: "omarchy-launch-browser".into(),
+                        delay: 0.25,
+                    },
                 ],
             },
         );
@@ -189,12 +217,22 @@ impl WorkflowManager {
                 ws_list.sort();
                 ws_list.dedup();
                 let ws_str = if !ws_list.is_empty() {
-                    format!(" [Workspaces: {}]", ws_list.iter().map(|w| w.to_string()).collect::<Vec<_>>().join(", "))
+                    format!(
+                        " [Workspaces: {}]",
+                        ws_list
+                            .iter()
+                            .map(|w| w.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 } else {
                     String::new()
                 };
 
-                lines.push(format!("• **{k}**{aliases_str}{ws_str}: {}", wf.description));
+                lines.push(format!(
+                    "• **{k}**{aliases_str}{ws_str}: {}",
+                    wf.description
+                ));
             }
         }
         Ok(lines.join("\n"))
@@ -206,7 +244,14 @@ impl WorkflowManager {
                 let mut lines = vec![
                     format!("### Workflow: {key}"),
                     format!("**Description**: {}", wf.description),
-                    format!("**Aliases**: {}", if wf.aliases.is_empty() { "None".to_string() } else { wf.aliases.join(", ") }),
+                    format!(
+                        "**Aliases**: {}",
+                        if wf.aliases.is_empty() {
+                            "None".to_string()
+                        } else {
+                            wf.aliases.join(", ")
+                        }
+                    ),
                     format!("**Primary Workspace**: {}", wf.primary_workspace),
                     "**Launch Steps**:".to_string(),
                 ];
@@ -228,7 +273,11 @@ impl WorkflowManager {
     pub async fn launch_workflow(&self, name: &str) -> Result<String> {
         let (key, wf) = match self.find_workflow(name) {
             Some(res) => res,
-            None => return Ok(format!("Workflow '{name}' not found. Use list_workflows to see options.")),
+            None => {
+                return Ok(format!(
+                    "Workflow '{name}' not found. Use list_workflows to see options."
+                ))
+            }
         };
 
         info!("Launching workflow '{key}' with {} steps", wf.steps.len());
@@ -252,7 +301,10 @@ impl WorkflowManager {
         sleep(Duration::from_millis(150)).await;
         let _ = self.hyprland.change_workspace(wf.primary_workspace).await;
 
-        Ok(format!("Workflow '{key}' launched successfully on primary workspace {}.", wf.primary_workspace))
+        Ok(format!(
+            "Workflow '{key}' launched successfully on primary workspace {}.",
+            wf.primary_workspace
+        ))
     }
 
     pub fn save_workflow(
@@ -275,7 +327,8 @@ impl WorkflowManager {
         if let Some(list) = aliases {
             for a in list {
                 let trimmed = a.trim().to_lowercase();
-                if !trimmed.is_empty() && trimmed != clean_slug && !clean_aliases.contains(&trimmed) {
+                if !trimmed.is_empty() && trimmed != clean_slug && !clean_aliases.contains(&trimmed)
+                {
                     clean_aliases.push(trimmed);
                 }
             }
@@ -298,10 +351,12 @@ impl WorkflowManager {
         );
 
         self.save_to_disk(&workflows)?;
-        Ok(format!("Successfully saved custom workflow '{clean_slug}' with {step_count} launch steps."))
+        Ok(format!(
+            "Successfully saved custom workflow '{clean_slug}' with {step_count} launch steps."
+        ))
     }
 
-    pub fn delete_workflow(&self, name: &str) -> Result<String> {
+    pub async fn delete_workflow(&self, name: &str) -> Result<String> {
         let clean = name.trim().to_lowercase();
         let mut workflows = self.get_workflows();
 
@@ -321,6 +376,22 @@ impl WorkflowManager {
 
         match target_key {
             Some(k) => {
+                let req = ConfirmationRequest {
+                    title: "Confirm Workflow Deletion",
+                    prompt: &format!("Are you sure you want to delete custom workflow '{k}'?"),
+                    spoken_prompt: &format!(
+                        "Are you sure you want to delete custom workflow '{k}'? Please confirm: yes or no."
+                    ),
+                    icon_name: "dialog-warning",
+                    timeout_secs: 15,
+                };
+
+                let confirmed = request_confirmation(&req, self.settings.as_ref()).await;
+                if !confirmed {
+                    info!("Workflow '{k}' deletion was cancelled by user.");
+                    return Ok(format!("Workflow '{k}' deletion was cancelled."));
+                }
+
                 workflows.remove(&k);
                 self.save_to_disk(&workflows)?;
                 Ok(format!("Workflow '{k}' has been deleted."))
@@ -369,7 +440,9 @@ impl WorkflowManager {
         }
 
         if steps.is_empty() {
-            return Ok("Could not resolve executable commands for the currently open windows.".to_string());
+            return Ok(
+                "Could not resolve executable commands for the currently open windows.".to_string(),
+            );
         }
 
         steps.sort_by_key(|s| s.workspace);
@@ -382,22 +455,36 @@ fn slugify(name: &str) -> String {
     let re = Regex::new(r"[^a-zA-Z0-9_\-]").unwrap();
     let replaced = re.replace_all(name, "_");
     let re_multi = Regex::new(r"_+").unwrap();
-    re_multi.replace_all(&replaced, "_").trim_matches('_').to_lowercase()
+    re_multi
+        .replace_all(&replaced, "_")
+        .trim_matches('_')
+        .to_lowercase()
 }
 
 fn map_client_to_launch_cmd(client: &Value) -> Option<String> {
     let initial_cls = client["initialClass"].as_str().unwrap_or("");
     let cls = client["class"].as_str().unwrap_or("");
-    let target_cls = if !initial_cls.is_empty() { initial_cls } else { cls }.trim();
+    let target_cls = if !initial_cls.is_empty() {
+        initial_cls
+    } else {
+        cls
+    }
+    .trim();
     let lower = target_cls.to_lowercase();
 
     // 1. Web Browsers
-    if ["helium", "chromium", "google-chrome", "firefox", "brave"].iter().any(|b| lower.contains(b)) {
+    if ["helium", "chromium", "google-chrome", "firefox", "brave"]
+        .iter()
+        .any(|b| lower.contains(b))
+    {
         return Some("omarchy-launch-browser".to_string());
     }
 
     // 2. Terminals
-    if ["foot", "kitty", "alacritty", "wezterm", "gnome-terminal"].iter().any(|t| lower.contains(t)) {
+    if ["foot", "kitty", "alacritty", "wezterm", "gnome-terminal"]
+        .iter()
+        .any(|t| lower.contains(t))
+    {
         return Some("omarchy-launch-terminal".to_string());
     }
 
@@ -461,7 +548,11 @@ fn map_client_to_launch_cmd(client: &Value) -> Option<String> {
 
     // 9. Generic binary check
     if !target_cls.is_empty() {
-        let short_bin = target_cls.split('.').next_back().unwrap_or(target_cls).to_lowercase();
+        let short_bin = target_cls
+            .split('.')
+            .next_back()
+            .unwrap_or(target_cls)
+            .to_lowercase();
         if which::which(&short_bin).is_ok() {
             return Some(short_bin);
         }
@@ -512,9 +603,9 @@ impl Tool for LaunchWorkflowTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("launch_workflow".into(), "name string is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("launch_workflow".into(), "name string is required".into())
+        })?;
 
         self.workflow.launch_workflow(name).await
     }
@@ -594,9 +685,12 @@ impl Tool for CaptureCurrentWorkflowTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("capture_current_workflow".into(), "name string is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "capture_current_workflow".into(),
+                "name string is required".into(),
+            )
+        })?;
         let description = args["description"].as_str().unwrap_or("");
         let aliases = args["aliases"].as_str().map(|a| {
             a.split(',')
@@ -605,7 +699,9 @@ impl Tool for CaptureCurrentWorkflowTool {
                 .collect()
         });
 
-        self.workflow.capture_current_setup(name, description, aliases).await
+        self.workflow
+            .capture_current_setup(name, description, aliases)
+            .await
     }
 }
 
@@ -659,20 +755,31 @@ impl Tool for SaveCustomWorkflowTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("save_custom_workflow".into(), "name is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter("save_custom_workflow".into(), "name is required".into())
+        })?;
         let description = args["description"].as_str().unwrap_or("");
         let primary_workspace = args["primary_workspace"].as_i64().unwrap_or(1) as i32;
 
         let steps: Vec<WorkflowStep> = if let Some(arr) = args["steps_json"].as_array() {
-            serde_json::from_value(Value::Array(arr.clone()))
-                .map_err(|e| JarvisError::ToolParameter("save_custom_workflow".into(), format!("Invalid steps format: {e}")))?
+            serde_json::from_value(Value::Array(arr.clone())).map_err(|e| {
+                JarvisError::ToolParameter(
+                    "save_custom_workflow".into(),
+                    format!("Invalid steps format: {e}"),
+                )
+            })?
         } else if let Some(str_val) = args["steps_json"].as_str() {
-            serde_json::from_str(str_val)
-                .map_err(|e| JarvisError::ToolParameter("save_custom_workflow".into(), format!("Invalid steps JSON: {e}")))?
+            serde_json::from_str(str_val).map_err(|e| {
+                JarvisError::ToolParameter(
+                    "save_custom_workflow".into(),
+                    format!("Invalid steps JSON: {e}"),
+                )
+            })?
         } else {
-            return Err(JarvisError::ToolParameter("save_custom_workflow".into(), "steps_json must be a JSON array or string".into()));
+            return Err(JarvisError::ToolParameter(
+                "save_custom_workflow".into(),
+                "steps_json must be a JSON array or string".into(),
+            ));
         };
 
         let aliases = args["aliases"].as_str().map(|a| {
@@ -682,7 +789,8 @@ impl Tool for SaveCustomWorkflowTool {
                 .collect()
         });
 
-        self.workflow.save_workflow(name, description, steps, aliases, primary_workspace)
+        self.workflow
+            .save_workflow(name, description, steps, aliases, primary_workspace)
     }
 }
 
@@ -720,11 +828,14 @@ impl Tool for DeleteCustomWorkflowTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("delete_custom_workflow".into(), "name string is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "delete_custom_workflow".into(),
+                "name string is required".into(),
+            )
+        })?;
 
-        self.workflow.delete_workflow(name)
+        self.workflow.delete_workflow(name).await
     }
 }
 
@@ -762,9 +873,12 @@ impl Tool for GetWorkflowDetailsTool {
     }
 
     async fn execute(&self, args: Value) -> Result<String> {
-        let name = args["name"]
-            .as_str()
-            .ok_or_else(|| JarvisError::ToolParameter("get_workflow_details".into(), "name string is required".into()))?;
+        let name = args["name"].as_str().ok_or_else(|| {
+            JarvisError::ToolParameter(
+                "get_workflow_details".into(),
+                "name string is required".into(),
+            )
+        })?;
 
         self.workflow.get_workflow_details(name)
     }
