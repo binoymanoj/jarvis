@@ -69,7 +69,7 @@ Jarvis utilizes an edge-to-cloud split architecture: continuous microphone strea
 
 | Component | Model Name | Provider / Engine | Target | Latency | Key Attributes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Wake Word Detection** | `hey_jarvis_v0.1.onnx` | `ort` (C API ONNX Runtime) | Local CPU | **~25 ms** | 16 kHz sliding window, Soft AGC normalization, threshold 0.22 |
+| **Wake Word Detection** | `hey_jarvis_v0.1.onnx` | `ort` (C API ONNX Runtime) | Local CPU | **~25 ms** | 16 kHz sliding window, Soft AGC normalization, threshold 0.50 |
 | **Voice Activity Detection** | `silero_vad.onnx` | `ort` (C API ONNX Runtime) | Local CPU | **~3 ms** | Real-time speech probability analysis; trailing 0.85s silence cutoff |
 | **Speech-to-Text (STT)** | `whisper-large-v3-turbo` | Groq Cloud LPU API | Cloud | **~150 - 200 ms** | Sub-second transcription, punctuation, and phrase formatting |
 | **Primary Reasoning (LLM)** | `gemini-3.5-flash-lite` | Google AI Studio | Cloud | **~400 - 650 ms** | Zero thinking budget, native parallel tool calling, high rate limits |
@@ -89,9 +89,9 @@ In idle state, the `jarvis.service` systemd daemon continuously reads the microp
 
 | Metric | Rust Daemon (`jarvis --daemon`) | Quickshell HUD (`qs`) | Notes |
 | :--- | :--- | :--- | :--- |
-| **Resident Memory (RSS)** | **~25 – 35 MB** | **~220 MB** | Down from ~410 MB in the old prototype |
-| **Virtual Memory (VSZ)** | ~600 MB | ~880 MB | Lean address space allocation |
-| **CPU Utilization** | **< 1.0%** of 1 core | **0.0%** | Single-threaded ONNX with zero busy-spin |
+| **Resident Memory (RSS)** | **~18 – 25 MB** | **~45 – 55 MB** | Down from ~410 MB daemon in prototype |
+| **Virtual Memory (VSZ)** | ~550 MB | ~750 MB | Lean address space allocation |
+| **CPU Utilization** | **< 0.8%** of 1 core | **0.0%** | Single-threaded ONNX with zero busy-spin |
 | **Disk I/O** | 0 KB/s | 0 KB/s | Zero disk writes at idle |
 | **Network Bandwidth** | 0 KB/s | 0 KB/s | 100% offline wake word listening |
 
@@ -108,22 +108,24 @@ During active conversational turns (wake word triggered → audio recorded → G
 
 ---
 
-## 3. Comprehensive Hands-Free Tool Palette (51 Tools)
+## 3. Comprehensive Hands-Free Tool Palette (55 Tools)
 
-Jarvis registers **51 native tools** directly inside Gemini's tool declaration registry:
+Jarvis registers **55 native tools** directly inside Gemini's tool declaration registry:
 
 1. **Virtual Input & Typing**: `type_text`, `press_key`, `send_shortcut`, `scroll`.
 2. **Linux Shell**: `execute_command`.
-3. **Media Control (MPRIS)**: `media_play_pause`, `media_next`, `media_previous`, `media_stop`, `get_now_playing`.
-4. **Power & Hardware**: `lock_screen`, `logout_system`, `reboot_system`, `shutdown_system`, `toggle_bluetooth`, `get_system_stats`, `network_speedtest`.
-5. **Wayland Clipboard**: `get_clipboard`, `set_clipboard`.
-6. **Hyprland Orchestration**: `switch_workspace`, `focus_application`, `close_active_window`, `toggle_fullscreen`, `toggle_layout_split`.
-7. **System Audio, Display & Themes**: `adjust_volume`, `set_brightness`, `set_theme`, `get_battery`, `launch_application`, `notify`.
-8. **Web Navigation**: `open_youtube`, `search_web`, `open_url`.
-9. **Multi-Workspace Workflows**: `launch_workflow`, `list_workflows`, `capture_current_workflow`, `save_custom_workflow`, `delete_custom_workflow`, `get_workflow_details`.
-10. **Calendar & Reminders**: `schedule_event`, `set_reminder`, `list_reminders`, `clear_reminders`.
-11. **Email Drafting**: `draft_email`.
-12. **Notes & Thought Capture**: `create_note`, `list_notes`.
-13. **Autonomous Project & Code Generation**: `create_project`, `delegate_to_antigravity`.
-14. **Screen Multimodal Vision**: `inspect_screen`.
-15. **Conversational Lifecycle**: `dismiss_session`.
+3. **Media Automation & MPRIS**: `play_media`, `resume_media`, `media_play_pause`, `media_next`, `media_previous`, `media_stop`, `get_now_playing`.
+4. **Local Network Sharing**: `localsend_share`.
+5. **Deep Technical Research**: `display_research_in_neovim`.
+6. **Power, Safety & Hardware**: `lock_screen`, `logout_system`, `reboot_system`, `shutdown_system`, `toggle_bluetooth`, `get_system_stats`, `network_speedtest`.
+7. **Wayland Clipboard**: `get_clipboard`, `set_clipboard`.
+8. **Hyprland Orchestration**: `switch_workspace`, `focus_application`, `close_active_window`, `toggle_fullscreen`, `toggle_layout_split`.
+9. **System Audio, Display & Themes**: `adjust_volume`, `set_brightness`, `set_theme`, `get_battery`, `launch_application`, `notify`.
+10. **Web Navigation**: `open_youtube`, `search_web`, `open_url`.
+11. **Multi-Workspace Workflows**: `launch_workflow`, `list_workflows`, `capture_current_workflow`, `save_custom_workflow`, `delete_custom_workflow`, `get_workflow_details`.
+12. **Calendar & Reminders**: `schedule_event`, `set_reminder`, `list_reminders`, `clear_reminders`.
+13. **Email Drafting**: `draft_email`.
+14. **Notes & Thought Capture**: `create_note`, `list_notes`.
+15. **Autonomous Project & Code Generation**: `create_project`, `delegate_to_antigravity`.
+16. **Screen Multimodal Vision**: `inspect_screen`.
+17. **Conversational Lifecycle**: `dismiss_session`.

@@ -13,21 +13,25 @@ Jarvis is a voice-first, multi-turn AI desktop assistant built specifically for 
 6. [Desktop, Window & Hardware Control (Hyprland & Omarchy)](#6-desktop-window--hardware-control-hyprland--omarchy)
 7. [Hands-Free Virtual Input & Navigation (Zero-Touch)](#7-hands-free-virtual-input--navigation-zero-touch)
 8. [Universal Linux Shell Execution](#8-universal-linux-shell-execution)
-9. [Media Playback & Track Control (MPRIS D-Bus)](#9-media-playback--track-control-mpris-d-bus)
+9. [Media Automation, TV Shows & MPRIS Playback](#9-media-automation-tv-shows--mpris-playback)
 10. [Wayland Clipboard Management](#10-wayland-clipboard-management)
-11. [System Power & Hardware Diagnostics](#11-system-power--hardware-diagnostics)
-12. [Multimodal Screen Perception & Vision](#12-multimodal-screen-perception--vision)
-13. [Web & Media Navigation](#13-web--media-navigation)
-14. [Quickshell HUD Overlay & Dynamic Theming](#14-quickshell-hud-overlay--dynamic-theming)
-15. [Audio Pipeline & Voice Engine](#15-audio-pipeline--voice-engine)
-16. [Hands-Free Wake Word Detection ("Hey Jarvis")](#16-hands-free-wake-word-detection-hey-jarvis)
-17. [Omarchy Menu Bar Icon & Popover Controls](#17-omarchy-menu-bar-icon--popover-controls)
-18. [Push-to-Talk, Hotkeys & Emergency Kill Switch](#18-push-to-talk-hotkeys--emergency-kill-switch)
-19. [Systemd Background Service & Daemon](#19-systemd-background-service--daemon)
-20. [Continuous Conversation & Kill Words](#20-continuous-conversation--kill-words)
-21. [Quota Resiliency & Multi-Tier Fallback](#21-quota-resiliency--multi-tier-fallback)
-22. [Performance Benchmarks & Resource Profiles](#22-performance-benchmarks--resource-profiles)
-23. [CLI Commands Reference](#23-cli-commands-reference)
+11. [LocalSend Synchronization & Seamless Sharing (`localsend_share`)](#11-localsend-synchronization--seamless-sharing-localsend_share)
+12. [Deep Research & Floating Neovim Markdown Viewer (`display_research_in_neovim`)](#12-deep-research--floating-neovim-markdown-viewer-display_research_in_neovim)
+13. [System Power, Themed Confirmation TUI & Diagnostics](#13-system-power-themed-confirmation-tui--diagnostics)
+14. [Multimodal Screen Perception & Vision](#14-multimodal-screen-perception--vision)
+15. [Web & Media Navigation](#15-web--media-navigation)
+16. [Quickshell HUD Overlay & Dynamic Theming](#16-quickshell-hud-overlay--dynamic-theming)
+17. [Audio Pipeline & Voice Engine](#17-audio-pipeline--voice-engine)
+18. [Hands-Free Wake Word Detection ("Hey Jarvis")](#18-hands-free-wake-word-detection-hey-jarvis)
+19. [Omarchy Menu Bar Icon & Popover Controls](#19-omarchy-menu-bar-icon--popover-controls)
+20. [Push-to-Talk, Hotkeys & Emergency Kill Switch](#20-push-to-talk-hotkeys--emergency-kill-switch)
+21. [Systemd Background Service & Daemon](#21-systemd-background-service--daemon)
+22. [Continuous Conversation & Kill Words](#22-continuous-conversation--kill-words)
+23. [Activity History & Log Streaming (`jarvis.log`)](#23-activity-history--log-streaming-jarvislog)
+24. [Quota Resiliency & Multi-Tier Fallback](#24-quota-resiliency--multi-tier-fallback)
+25. [Performance Benchmarks & Resource Profiles](#25-performance-benchmarks--resource-profiles)
+26. [CLI Commands Reference](#26-cli-commands-reference)
+27. [Desktop Notification System & Task Progress Indicators](#27-desktop-notification-system--task-progress-indicators)
 
 
 ---
@@ -231,17 +235,43 @@ Execute arbitrary bash commands and scripts on demand with built-in safety contr
 
 ---
 
-## 9. Media Playback & Track Control (MPRIS D-Bus)
+## 9. Media Automation, TV Shows & MPRIS Playback
 
-Control multimedia playback across any MPRIS-compliant media player (Chromium, YouTube, Spotify, Firefox, mpv, VLC) with zero extra dependencies using native D-Bus calls.
+Jarvis includes native media automation for browsing, launching, and resuming movies and TV series across your local storage, in addition to full MPRIS D-Bus transport control for active players.
 
-### Features
+### TV Show & Movie Playback (`play_media`)
+* **Intelligent File Resolution**: Scans user-configured media folders (`media_dirs` in `config.toml`) and performs fuzzy-matching on titles, seasons, and episode numbers.
+* **Flexible Format & Naming Support**:
+  - Handles standard naming (`S01E12`, `1x12`, `Season 1/Episode 12`).
+  - Supports video files with or without dotted extensions (e.g. `.mkv`, ` mkv`, `.mp4`, `.avi`, `.webm`).
+* **Fullscreen by Default**: Automatically opens video files in fullscreen (`--fs`) using `mpv` (or configured player).
+
+### Seamless Resumption (`resume_media`)
+* **Episode & Timestamp Resumption**: Saying *"continue <show> from where I left off"* checks `~/.local/state/jarvis/media_history.json` for the last played episode and invokes `mpv --save-position-on-quit` to resume from the exact second you stopped watching.
+* **Fallback History Search**: If no exact match is found in recent history, scans media folders for the first episode or matching video file.
+
+### Media Directory Configuration (`config.toml`)
+Customize media directories and your preferred video player in `~/.config/jarvis/config.toml`:
+```toml
+[media]
+media_dirs = [
+    "~/Videos",
+    "~/Movies",
+    "~/Downloads",
+]
+player = "mpv"
+```
+
+### MPRIS D-Bus Transport Control
+Control multimedia playback across any MPRIS-compliant media player (Chromium, YouTube, Spotify, Firefox, mpv, VLC) with zero extra dependencies:
 * **Full Transport Control**: Play/Pause toggle, Next track, Previous track, Stop.
 * **Live Metadata Query**: Reads real-time track title, artist name, and player application name.
-* **Universal Compatibility**: Works out of the box with web browsers and native desktop media players.
 
 ### Voice Commands
-* *"Jarvis, pause the music"* / *"Play"*
+* *"Jarvis, open Prison break ep12 from season 1"*
+* *"Play Prison Break season 1 episode 5 in full screen"*
+* *"Continue Prison break from where I left off"*
+* *"Pause the music"* / *"Play"*
 * *"Skip to the next song"*
 * *"Go back to the previous track"*
 * *"What song is playing right now?"*
@@ -264,9 +294,61 @@ Access and modify the Wayland system clipboard hands-free via `wl-clipboard` (`w
 
 ---
 
-## 11. System Power & Hardware Diagnostics
+## 11. LocalSend Synchronization & Seamless Sharing (`localsend_share`)
+
+Jarvis features first-class synchronization with **LocalSend** (`localsend` / `localsend-cli`), enabling instant, zero-click local network sharing to smartphones, tablets, and other computers.
+
+### Features
+* **Call Out and Send**: Simply say the name of any file, document, photo, video, or series episode, and Jarvis locates it and loads it directly into LocalSend's sending window.
+* **Intelligent File Resolution**: Automatically traverses `~/Downloads`, `~/Documents`, `~/Pictures`, `~/Desktop`, `~/Videos`, `~/Codes`, and configured TV show/media directories with fuzzy name matching and episode/season detection (e.g. "Prison break ep12").
+* **Screenshot & Clipboard Sharing**: Share your latest screenshot (`"share screenshot"`) or active clipboard text (`"share clipboard"`) with zero friction.
+* **Instant Foreground Focus**: Dispatches Hyprland window focus (`org.localsend.localsend_app`) so the LocalSend sending window immediately surfaces in front of you.
+* **Direct Device Targeting**: Optionally targets specific devices or IPs directly via `localsend-cli` (`--alias` / `--to`).
+
+### Voice Commands
+* *"Jarvis, share my resume on localsend"*
+* *"Send Prison break episode 12 via localsend"*
+* *"Share this screenshot with localsend"*
+* *"Share my clipboard on localsend"*
+* *"Send https://github.com/localsend/localsend to localsend"*
+
+---
+
+## 12. Deep Research & Floating Neovim Markdown Viewer (`display_research_in_neovim`)
+
+When you ask for research, in-depth technical analysis, documentation, or study breakdowns on any topic, Jarvis compiles a comprehensive, multi-section report in Markdown and displays it inside a centered, floating **Neovim** modal window on your desktop.
+
+### Features
+* **In-Depth Report Generation**: Structures findings into executive summaries, architecture overviews, ASCII diagrams, equations, tables, code blocks, and key takeaways.
+* **Dedicated Floating Window**: Opens in Kitty or Foot tagged with `TUI.float` (matching Omarchy centered floating modal geometry: `980x700px`).
+* **Omarchy Theme Synced**: Window background and typography automatically inherit the active Omarchy palette (`theme.dark_background` and `theme.foreground`).
+* **Optimized Viewer Mode**: Runs Neovim in read-only mode (`nvim -R`) with soft line wrapping (`wrap linebreak`), conceallevel rendering, and no line numbers.
+* **Quick Dismissal**: Press `q` or `Ctrl+C` to close the floating window and return to your workspace instantly.
+* **Persistent Research Cache**: Research notes are automatically saved to `~/.cache/jarvis/research/<slug>_<timestamp>.md` for future reference.
+
+### Voice Commands
+* *"Jarvis, research how quantum computing error correction works"*
+* *"Research the architecture of Linux epoll and show it to me"*
+* *"Look up the differences between WireGuard and OpenVPN"*
+* *"Research the new features in Rust 2024 edition"*
+* *"Deep dive into WebAssembly SIMD performance"*
+
+---
+
+## 13. System Power, Themed Confirmation TUI & Diagnostics
 
 Perform system power operations, Bluetooth management, and network throughput testing.
+
+### Safety Confirmations (Themed Floating TUI Modal & Voice Confirmation)
+To protect your workstation against accidental shutdowns, reboots, logouts, or workflow deletions:
+* **Themed Terminal Modal Dialog**: Major commands trigger a centered, floating TUI card (`TUI.float`) launched in Kitty/Foot styled with your active Omarchy theme colors (`theme.accent`, `theme.bright_red`, `theme.dark_background`, `theme.foreground`).
+* **Visual Pill Buttons & Countdown**: Displays high-contrast interactive buttons (`[ ✔ Yes, proceed (y) ]` and `[ ✖ Cancel (n) ]`) with a real-time auto-cancellation countdown timer (`⏱ Auto-cancelling in 15s`).
+* **Simultaneous Voice Confirmation**: While the popup is displayed, Jarvis speaks the confirmation prompt, pulses the listening HUD, and accepts hands-free voice confirmation (`󰍬 Listening for voice: "yes" / "no"`).
+* **Multimodal Decision**:
+  - **Confirm via Voice**: Saying *"yes"*, *"confirm"*, *"proceed"*, *"do it"*, or *"reboot"* immediately dismisses the popup and executes the command.
+  - **Cancel via Voice**: Saying *"no"*, *"cancel"*, *"abort"*, or *"stop"* closes the popup and aborts execution safely.
+  - **Keyboard Controls**: Press `y` / `n`, Tab / Arrow keys, Enter, Space, or `Esc` to decide immediately.
+  - **Safety Timeout**: After 15 seconds without confirmation, the action is automatically cancelled.
 
 ### Features
 * **Lock & Power State**: Lock screen (`omarchy system lock`), logout (`omarchy system logout`), reboot (`omarchy system reboot`), and shutdown (`omarchy system shutdown`).
@@ -283,7 +365,7 @@ Perform system power operations, Bluetooth management, and network throughput te
 
 ---
 
-## 12. Multimodal Screen Perception & Vision
+## 14. Multimodal Screen Perception & Vision
 
 Ask Jarvis to visually inspect what is currently on your screen.
 
@@ -300,7 +382,7 @@ Ask Jarvis to visually inspect what is currently on your screen.
 
 ---
 
-## 13. Web & Media Navigation
+## 15. Web & Media Navigation
 
 Instantly access search engines, online videos, and websites.
 
@@ -314,12 +396,9 @@ Instantly access search engines, online videos, and websites.
 * *"Open MKBHD's latest video on YouTube"*
 * *"Open github.com"*
 
-
 ---
 
----
-
-## 14. Quickshell HUD Overlay & Dynamic Theming
+## 16. Quickshell HUD Overlay & Dynamic Theming
 
 A custom floating Heads-Up Display built using **Quickshell** matching the **Omarchy Linux** aesthetic.
 
@@ -338,7 +417,7 @@ A custom floating Heads-Up Display built using **Quickshell** matching the **Oma
 
 ---
 
-## 15. Audio Pipeline & Voice Engine
+## 17. Audio Pipeline & Voice Engine
 
 Optimized for near-instantaneous speech recognition and natural local voice synthesis.
 
@@ -348,18 +427,18 @@ Optimized for near-instantaneous speech recognition and natural local voice synt
 
 ---
 
-## 16. Hands-Free Wake Word Detection ("Hey Jarvis")
+## 18. Hands-Free Wake Word Detection ("Hey Jarvis")
 
 Jarvis features continuous, zero-latency offline wake word detection powered by `openWakeWord` and the pre-trained `hey_jarvis_v0.1.onnx` neural model.
-* **Hands-Free Activation**: Speak *"Hey Jarvis"* or *"Jarvis"* anytime to awaken the assistant without needing to touch the keyboard.
-* **Zero Cloud Latency**: Processes 16kHz audio in 80ms chunks on CPU with minimal resource usage (~1-2% total system CPU).
-* **Configurable Sensitivity**: Tuned by default to `0.28` in `.env` via `JARVIS_WAKEWORD_THRESHOLD=0.28` to reliably trigger on both *"Hey Jarvis"* and *"Jarvis"*.
+* **Hands-Free Activation**: Speak *"Hey Jarvis"* (or configured *"Hey <name>"*) anytime to awaken the assistant hands-free. Requiring the "Hey" prefix prevents accidental triggers from ambient chatter or casually saying "Jarvis" in conversation.
+* **Zero Cloud Latency**: Processes 16kHz audio in 80ms chunks on CPU with minimal resource usage (~0.8% total system CPU).
+* **Calibrated Sensitivity (0.50 Threshold)**: Tuned to `0.50` by default via `threshold = 0.50` in `~/.config/jarvis/config.toml`, cleanly separating clear *"Hey Jarvis"* intent (score ~0.99) from standalone *"Jarvis"* (score ~0.18) or ambient chatter (<0.05).
 * **Dynamic Soft AGC**: Automatically boosts low-volume microphone streams (such as Bluetooth headsets or laptop internal mics) so wake word embeddings remain clear and accurate.
 * **Instant Audio Chime**: Plays a subtle two-tone wake chime the moment the wake word triggers to confirm that Jarvis has awakened and is listening.
 
 ---
 
-## 17. Omarchy Menu Bar Icon & Popover Controls
+## 19. Omarchy Menu Bar Icon & Popover Controls
 
 Jarvis integrates natively into the **Omarchy Top Bar** (Quickshell) as a first-class bar-widget plugin (`~/.config/omarchy/plugins/jarvis/`).
 
@@ -383,7 +462,7 @@ Clicking the menu bar icon reveals a floating `KeyboardPanel` popover offering q
 
 ---
 
-## 18. Push-to-Talk, Hotkeys & Emergency Kill Switch
+## 20. Push-to-Talk, Hotkeys & Emergency Kill Switch
 
 Configured natively in `~/.config/hypr/bindings.lua`:
 
@@ -394,7 +473,7 @@ Configured natively in `~/.config/hypr/bindings.lua`:
 
 ---
 
-## 19. Systemd Background Service & Daemon
+## 21. Systemd Background Service & Daemon
 
 Jarvis can run continuously in the background listening for wake words via user systemd service:
 
@@ -422,7 +501,7 @@ journalctl --user -u jarvis -f
 
 ---
 
-## 20. Continuous Conversation & Kill Words
+## 22. Continuous Conversation & Kill Words
 
 Jarvis maintains context across sequential commands within the same session. After executing an action, Jarvis remains active and attentive for follow-up requests.
 
@@ -438,7 +517,33 @@ Jarvis will acknowledge with a polite farewell and cleanly hide the HUD overlay.
 
 ---
 
-## 21. Quota Resiliency & Multi-Tier Fallback
+## 23. Activity History & Log Streaming (`jarvis.log`)
+
+Jarvis maintains a persistent, structured, append-only execution log of all spoken commands, transcribed queries, tool calls, model responses, system events, and diagnostic traces at `~/.local/state/jarvis/jarvis.log`.
+
+### Features
+* **Persistent Activity Record**: Every conversation turn, executed tool call, shell output, media action, and system event is permanently logged with millisecond timestamps and ISO 8601 formatting.
+* **Instant Log Inspection**: Query recent interactions directly from the terminal with `jarvis -l` or `jarvis --logs`.
+* **Real-Time Log Following**: Stream live activity as it happens using `jarvis -l -f` or `jarvis --logs --follow`.
+* **Path Discovery**: Retrieve the exact filesystem path using `jarvis --logs-path` (ideal for piping into Neovim, `bat`, or custom scripts).
+
+### CLI Usage
+```bash
+# View the last 50 activity log entries in a formatted terminal view
+jarvis -l
+jarvis --logs
+
+# Follow live activity in real time (stream log updates as you speak)
+jarvis -l -f
+jarvis --logs --follow
+
+# Output the absolute path to jarvis.log
+jarvis --logs-path
+```
+
+---
+
+## 24. Quota Resiliency & Multi-Tier Fallback
 
 Eliminates API quota lockouts and delays through automatic cascading fallback:
 1. **`gemini-3.5-flash-lite`** *(Primary)*: Sub-second response time with high free-tier rate limits.
@@ -452,22 +557,24 @@ If any model encounters a 429 quota exhaustion or rate limit, Jarvis seamlessly 
 
 ---
 
-## 22. Performance Benchmarks & Resource Profiles
+## 25. Performance Benchmarks & Resource Profiles
 
 For granular micro-benchmarks, hardware profiling, latency timelines, and idle/active memory graphs, refer to the full report in:
 **[Performance & Specifications Document](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)**
 
-### Quick Resource Summary:
-* **Background Idle Memory (RSS)**: ~373 MB (Daemon) + ~224 MB (Quickshell HUD) = **~597 MB total** (<1.9% of system RAM).
-* **Background Idle CPU**: **~10-12% of 1 core** (~1.3% total CPU capacity).
-* **Active Turn Memory**: ~408 MB peak.
-* **Active Turn CPU**: ~35-55% of 1 core burst during Piper ONNX synthesis (~150ms).
-* **Network Footprint**: 0 KB/s idle (100% offline listening); ~25-80 KB per active voice turn.
-* **End-to-End Perceived Turnaround**: **~1.25 - 1.55 seconds**.
+### Quick Resource Summary (100% Native Rust v0.2.0):
+* **Daemon Idle Memory (RSS)**: **~18 – 25 MB** (native Rust with `mimalloc`, down from ~410 MB in Python prototype).
+* **Quickshell HUD Overlay**: **~45 – 55 MB** (Wayland layer-shell HUD).
+* **Total Idle RAM**: **< 68 MB total** (<0.2% of system RAM on 32GB host).
+* **Daemon Idle CPU**: **< 0.8% of 1 core** (~0.1% total CPU capacity). Single-threaded ONNX with zero busy-spin.
+* **Active Turn Peak Memory**: **~35 – 45 MB** daemon peak.
+* **Active Turn CPU**: **~2% - 5%** of 1 core burst during audio normalization and HTTP dispatch.
+* **Network Footprint**: 0 KB/s idle (100% offline wake word listening); ~20-50 KB per active voice turn.
+* **End-to-End Perceived Turnaround**: **~1.10 - 1.35 seconds**.
 
 ---
 
-## 23. CLI Commands Reference
+## 26. CLI Commands Reference
 
 Jarvis can be invoked directly from the terminal or scripted into custom Hyprland hotkeys:
 
@@ -510,17 +617,64 @@ jarvis -c "open my dev workflow" --no-speech
 # Scaffold a project autonomously via configured CLI AI tool (agy, claude, or codex)
 jarvis -c "create a python CLI called csv_tool in ~/Codes/personal/csv_tool" --no-speech
 
-# Scaffold a project in an interactive floating popup modal
-jarvis -c "create a rust app called fast_grep in a popup window" --no-speech
+# Launch the themed confirmation TUI modal directly (for scripting or testing)
+jarvis --confirm-tui --title "System Reboot" --prompt "Are you sure you want to reboot the system now?"
+
+# View recent Jarvis activity history (tool invocations, spoken commands, replies)
+jarvis -l
+jarvis --logs
+
+# Follow live activity stream in real time
+jarvis -l -f
+jarvis --logs --follow
+
+# Print absolute path to the active jarvis.log file
+jarvis --logs-path
 ```
+
+---
+
+## 27. Desktop Notification System & Task Progress Indicators
+
+Jarvis integrates an intelligent, zero-spam desktop notification system designed specifically for the Omarchy Linux desktop and Hyprland. Built around [`TaskNotifier`](file:///home/binoy/Codes/personal/jarvis/src/ui/notification.rs), notifications provide immediate visual feedback across three coordinated desktop surfaces without cluttering your screen.
+
+### 1. In-Place Lifecycle Updates (`TaskNotifier`)
+* **Live In-Place Replacement**: When a multi-step or background task begins, a single toast notification appears with the tool's custom glyph and descriptive progress message. As intermediate tools execute (e.g. running diagnostics, generating markdown, or staging files), the toast updates **in-place** using replace IDs (`omarchy-notification-send -r` / `notify-send -r`), preventing notification stack spam.
+* **Auto-Dismissal**: Upon completion, the toast transitions to its completion title and concise summary, then auto-dismisses after 4 seconds.
+* **Kill-Switch Dismissal**: Triggering the emergency kill switch (`Super + Alt + Escape`) immediately clears the toast from your desktop.
+
+### 2. Tailored Functionality Notifications
+Notifications are selectively targeted to essential desktop functionalities:
+* **󰁹 Battery Health & Diagnostics**: Live notification while querying battery statistics, followed by a completion toast summarizing charge percentage, health capacity, and cycle count.
+* **󰛳 Network Speedtest**: Displays active testing indicator during the 15-second throughput measurement, followed by download/upload throughput and latency results.
+* **󰐌 Media Player & Playback Resume**: Visual confirmation displaying matched TV show episode, movie title, or audio track launched in fullscreen.
+* **󰈙 Research Assistant in Floating Neovim**: Emits notification while gathering and compiling deep research, followed by confirmation when the floating Neovim popup opens.
+* **󰄬 LocalSend Synchronization**: Visual confirmation displaying the shared file/item and nearby target device status.
+* **󰏪 Notes & Scratchpad**: Toast confirming note title and saved markdown file location in `~/Notes/`.
+* **󰔛 Reminders & Countdown Timers**: Immediate notification confirming reminder duration, target time, and label.
+* **󰸗 Calendar Scheduling**: Notification displaying scheduled event title and datetime.
+* **󰌨 Multi-Workspace Workflows**: Visual confirmation of active workspace switches and launched application stacks.
+* **󰅍 Clipboard Synchronization**: Low-urgency preview confirmation when text or code is copied to the Wayland clipboard.
+
+### 3. System State Notifications
+* **󰚩 Wake Word Toggle (`jarvis -W` / Menubar toggle)**: Instant toast displaying `"Wake Word: Enabled"` or `"Wake Word: Disabled"`.
+* **󰚩 Emergency Stop (`Super + Alt + Escape` / `jarvis -k`)**: Toast confirming session termination and immediate audio silence.
+* **󰚩 Daemon Restart (`jarvis -r`)**: Notification confirming daemon restart and menubar plugin rescan.
+* **󰐥 Power Actions & Confirmations**: Notification indicating active confirmation TUI for reboot or shutdown.
+
+### 4. Zero-Spam Design Philosophy
+To keep your desktop distraction-free, notifications are **never** emitted for:
+* Plain conversational Q&A (e.g. math questions, conversational facts) — voice audio and terminal replies handle these directly.
+* Volume or brightness adjustments — native Omarchy OSD indicators already provide visual feedback.
+* Direct window keystrokes or workspace navigation.
 
 ---
 
 ## 📄 Related Documentation
 * [Performance Benchmarks & Technical Specifications](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)
-* [Rust Migration Roadmap (Future Memory Optimization)](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
+* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [Multi-Workspace Workflows Guide](file:///home/binoy/Codes/personal/jarvis/docs/WORKFLOW.md)
 * [System Audit & Complete Uninstallation Guide](file:///home/binoy/Codes/personal/jarvis/docs/CLEANUP.md)
-* [Architecture & Todo Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)
+* [Architecture & Living Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)
 
 

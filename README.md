@@ -50,29 +50,45 @@ Launch full-blown multi-window development and productivity environments across 
 * **Safe Terminal Execution**: "Run git status", "Check available memory with free -h", "List files in Downloads".
 * Built-in 15s timeout protection and intelligent buffer truncation.
 
-### 9. 🎵 Media & Track Control (MPRIS D-Bus)
-* **Playback Control**: "Pause music", "Next track", "Previous track", "Play", "Stop".
+### 9. 🎬 Movie, TV Show & Music Automation
+* **Episode & Movie Playback**: "Open Prison break ep12 from season 1", "Play Interstellar in full screen". Jarvis scans configured media directories, fuzzy-matches titles, seasons, and episodes, and launches playback in fullscreen via `mpv`.
+* **Seamless Resume**: "Continue Prison break from where I left off". Jarvis tracks playback history (`~/.local/state/jarvis/media_history.json`) and leverages `mpv`'s position memory to resume the exact episode and timestamp.
+* **Customizable Media Folders**: Configure custom directories (e.g. `["~/Videos", "~/Movies", "~/Downloads"]`) and player in `~/.config/jarvis/config.toml`.
+* **MPRIS Playback Control**: "Pause music", "Next track", "Previous track", "Play", "Stop".
 * **Live Query**: "What song is playing right now?" (introspects Spotify, Chromium/YouTube, mpv, Firefox, etc.).
 
 ### 10. 📋 Clipboard & System Power
 * **Clipboard Management**: "What is on my clipboard?", "Copy this link to my clipboard".
-* **Power & Diagnostics**: "Lock the screen", "Reboot system", "Toggle Bluetooth", "System status", "Run network speedtest".
+* **Power & Diagnostics**: "Lock the screen", "Reboot system", "Shut down the computer", "Toggle Bluetooth", "System status", "Run network speedtest".
+* **Themed TUI & Voice Confirmation**: Critical system operations (shutdown, reboot, logout, workflow deletion) automatically launch a centered, floating TUI modal (`TUI.float`) styled with active Omarchy palette colors, interactive pill buttons, and a 15-second countdown timer, while simultaneously listening for hands-free voice confirmation ("yes"/"confirm" vs "no"/"cancel").
 
-### 11. 🌐 Web & Media Navigation
+### 11. 📲 LocalSend Synchronization & Seamless Sharing
+* **Call Out and Share**: Say the name of any file, document, photo, or series episode (e.g. *"Share my resume on localsend"*, *"Send Prison break episode 12 via localsend"*), and Jarvis resolves it and queues it into LocalSend's sending window.
+* **Clipboard & Screenshots**: *"Share my clipboard on localsend"*, *"Share this screenshot with localsend"*.
+* **Hyprland Auto-Focus**: Dispatches window focus (`org.localsend.localsend_app`) so LocalSend immediately surfaces in the foreground.
+* **CLI & Direct Transfer**: Compatible with GUI `localsend` and headless `localsend-cli` for targeting specific devices or IPs directly.
+
+### 12. 🔬 Deep Research & Floating Neovim Markdown Viewer
+* **Multi-Section Technical Reports**: *"Research how quantum computing error correction works"*, *"Deep dive into Linux epoll architecture"*. Jarvis generates structured Markdown reports complete with executive summaries, ASCII diagrams, equations, and code blocks.
+* **Centered Floating Modal**: Opens instantly in a centered, floating Neovim window (`TUI.float`) styled with your active Omarchy theme colors.
+* **Quick Dismissal**: Configured in read-only mode (`nvim -R`) with soft text wrapping. Press `q` or `Ctrl+C` to close and return to your work immediately.
+* **Local Persistence**: Reports are cached at `~/.cache/jarvis/research/<slug>_<timestamp>.md`.
+
+### 13. 🌐 Web & Media Navigation
 * **Instant Search**: "Search the web for Arch Linux PipeWire configuration".
 * **YouTube Playback**: "Open MKBHD's latest video on YouTube".
 * **Direct URLs**: "Open github.com".
 
-### 12. 👁️ Screen Perception & Multimodal Vision
+### 14. 👁️ Screen Perception & Multimodal Vision
 * "Take a look at my screen and help me debug this code error".
 * Takes an instantaneous snapshot via `grim` and uses Gemini's multimodal vision to analyze active windows and errors.
 
-### 13. 🎙️ Hands-Free Wake Word ("Hey Jarvis")
-* **Continuous Offline Detection**: Powered by `openWakeWord` and `hey_jarvis_v0.1.onnx` with zero cloud latency and ~1% CPU usage.
-* **Hands-Free Activation**: Speak *"Hey Jarvis"* or *"Jarvis"* to immediately trigger the conversational HUD without touching the keyboard.
+### 15. 🎙️ Hands-Free Wake Word ("Hey Jarvis")
+* **Continuous Offline Detection**: Powered by `openWakeWord` and `hey_jarvis_v0.1.onnx` with zero cloud latency and <0.8% CPU usage.
+* **Hands-Free Activation**: Speak *"Hey Jarvis"* (or custom *"Hey <name>"*) to immediately trigger the conversational HUD without touching the keyboard. Requiring the "Hey" prefix eliminates false activations from casual mentions of "Jarvis" or ambient room conversation.
 * **Background Daemon & Systemd**: Managed seamlessly via user systemd service (`systemctl --user start/enable jarvis`).
 
-### 14. 📊 Omarchy Top Bar Widget & Popover UI
+### 16. 📊 Omarchy Top Bar Widget & Popover UI
 * **Live Menu Bar Icon**: Robot glyph (`󰚩`) in the top bar matching active Omarchy theme colors.
 * **Microphone Active Dot**: A bright, pulsing red indicator dot appears strictly when the microphone is recording audio.
 * **Interactive Control Popover**: Left-click to open a floating panel with instant controls:
@@ -81,6 +97,19 @@ Launch full-blown multi-window development and productivity environments across 
   - Quick action workflow launchers (Dev Setup, Screen Vision, Notes, Media Hub).
   - System controls: **Restart** (`󰑐`) to reload the daemon and widget, and **Quit Jarvis** (`󰗼`) to completely stop all processes (`systemctl --user stop jarvis`, background daemons, audio) and release all CPU & memory.
   - Active coding CLI indicator.
+
+### 17. 🔔 Desktop Notifications & Active Progress Indicators
+* **In-Place Progress Toasts**: Background and multi-step tasks (battery diagnostics, network speedtests, media playback, deep research generation, and project scaffolding) trigger dynamic in-place desktop toasts (`TaskNotifier`). The notification updates smoothly as steps complete and auto-dismisses after 4 seconds.
+* **Targeted System Notifications**: Dedicated notification feedback for key events:
+  - 󰚩 Wake Word toggled on/off (`jarvis -W`).
+  - 󰚩 Kill Switch activated (`SUPER + ALT + ESCAPE`).
+  - 󰐌 Media playback matched and launched in fullscreen.
+  - 󰈙 Research compiled and opened in floating Neovim.
+  - 󰄬 LocalSend share dispatched.
+  - 󰏪 Notes saved to disk.
+  - 󰔛 Reminders and calendar events scheduled.
+  - 󰌨 Workflows activated.
+* **Zero-Spam Filter**: Trivial conversational questions and OS-level volume/brightness changes never emit redundant desktop notifications.
 
 
 ---
@@ -112,20 +141,29 @@ Jarvis will politely acknowledge and dismiss the HUD.
 
 ## ⚙️ Architecture & Tech Stack
 
+* **100% Native Rust Architecture**: Compiled binary (`jarvis v0.2.0`) built with Tokio async runtime, `mimalloc` global allocator, and CPAL audio streaming.
+* **Ultra-Low Memory Footprint**: **~18–25 MB RSS idle memory** (<68 MB total including Quickshell HUD overlay).
 * **LLM Engine**: Google Gemini 3.5 Flash / Flash-Lite with multi-tier automatic quota fallback (`gemini-3.5-flash-lite` → `gemini-2.5-flash` → `gemini-flash-latest`).
-* **Speech-to-Text (STT)**: Groq Whisper Large v3 (~100ms ultra-fast transcription).
-* **Text-to-Speech (TTS)**: Local Piper neural TTS (`en_GB-alan-medium`) with Edge TTS fallback.
-* **Voice Activity Detection (VAD)**: Silero VAD ONNX model for voice boundary detection.
+* **Speech-to-Text (STT)**: Groq Whisper Large v3 Turbo (~150ms ultra-fast transcription).
+* **Text-to-Speech (TTS)**: Microsoft Edge Neural TTS (`en-GB-RyanNeural`) with local Piper neural TTS (`en_GB-alan-medium`) offline fallback.
+* **Voice Activity Detection (VAD)**: Silero VAD ONNX model for real-time speech boundary detection and trailing silence cutoff.
 * **HUD Overlay**: Transparent horizontal Quickshell interface with real-time waveform visualization matching Omarchy system themes.
 
 ---
 
 ## 🔧 Configuration (`.env`)
 
-All core options are configurable via `.env` (see [.env.example](file:///home/binoy/Codes/personal/jarvis/.env.example)):
+All core options can also be customized in `~/.config/jarvis/config.toml` (and `.env`, see [.env.example](file:///home/binoy/Codes/personal/jarvis/.env.example)):
 
-```bash
-cp .env.example .env
+```toml
+# ~/.config/jarvis/config.toml
+[core]
+model = "gemini-2.5-flash"
+wakeword_name = "jarvis" # Activated via "Hey Jarvis"
+
+[media]
+media_dirs = ["~/Videos", "~/Movies", "~/Downloads"]
+player = "mpv"
 ```
 
 Key environment variables:
@@ -133,6 +171,8 @@ Key environment variables:
 * **`GEMINI_API_KEY`**: Google Gemini API key for fast reasoning and vision.
 * **`GROQ_API_KEY`**: Groq API key for ultra-fast Whisper speech-to-text.
 * **`JARVIS_TTS_ENGINE`**: TTS engine (`piper` for local neural synthesis, `edge` for cloud fallback).
+* **`JARVIS_MEDIA_DIRS`**: Comma-delimited list of directories to scan for movies/series.
+* **`JARVIS_MEDIA_PLAYER`**: Default video player (`mpv`).
 * **`JARVIS_DEFAULT_WORKSPACE_ROOT`**: Default path for generated projects (`~/Codes/personal`).
 
 ---
@@ -158,6 +198,7 @@ omarchy-restart-shell
 jarvis --wakeword-status
 
 # Toggle wake word detection on or off
+jarvis -W
 jarvis --wakeword-toggle
 
 # Trigger voice assistant (push-to-talk toggle)
@@ -175,6 +216,20 @@ jarvis -c "what is my battery level"
 # Execute a command silently (text output only)
 jarvis -c "open my dev workflow" --no-speech
 
+# Launch the themed confirmation TUI modal directly (for testing or scripting)
+jarvis --confirm-tui --title "System Reboot" --prompt "Are you sure you want to reboot the system now?"
+
+# View recent Jarvis activity history and logs
+jarvis -l
+jarvis --logs
+
+# Follow live activity logs in real time
+jarvis -l -f
+jarvis --logs --follow
+
+# Print absolute path to jarvis.log
+jarvis --logs-path
+
 # Manage user systemd service
 systemctl --user start jarvis
 systemctl --user restart jarvis
@@ -187,8 +242,8 @@ systemctl --user status jarvis
 ## 📄 Documentation
 
 * [Performance Benchmarks & Technical Specifications](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)
-* [Rust Migration Roadmap (Future Memory Optimization)](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
+* [Rust Migration Roadmap & Completion Report](file:///home/binoy/Codes/personal/jarvis/docs/RUST_MIGRATION_TODO.md)
 * [Complete Capabilities & Feature Reference](file:///home/binoy/Codes/personal/jarvis/docs/CAPABILITIES.md)
 * [Multi-Workspace Workflows Guide](file:///home/binoy/Codes/personal/jarvis/docs/WORKFLOW.md)
 * [System Audit & Complete Uninstallation Guide](file:///home/binoy/Codes/personal/jarvis/docs/CLEANUP.md)
-* [Architecture & Todo Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)
+* [Architecture & Living Roadmap](file:///home/binoy/Codes/personal/jarvis/docs/ARCHITECTURE_AND_TODO.md)

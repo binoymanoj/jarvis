@@ -14,7 +14,7 @@
   Memory Allocator:  mimalloc (Drop-in high performance allocator)
   AI Provider:       gemini (Google AI Studio)
   Reasoning Model:   gemini-3.5-flash-lite (with 5-tier multi-model fallback)
-  Wake Word:         openWakeWord ONNX ('hey_jarvis_v0.1.onnx', threshold: 0.22)
+  Wake Word:         openWakeWord ONNX ('hey_jarvis_v0.1.onnx', threshold: 0.50)
   Editor / Terminal: nvim via kitty
   STT Engine:        groq (whisper-large-v3-turbo)
   TTS Engine:        edge (en-GB-RyanNeural) / local piper-tts
@@ -40,7 +40,7 @@
 │  │     AUDIO INPUT & VAD         │     │     FREE-TIER LLM & AGENT      │     │      SPEECH SYNTHESIS         │  │
 │  │ • PipeWire (cpal 0.18)        │────▶│ • Google Gemini (reqwest 0.13) │────▶│ • msedge-tts (neural stream)  │  │
 │  │ • openWakeWord ONNX (ort 2.0) │     │ • GroqCloud (Whisper & Llama)  │     │ • piper-tts (local fallback)  │  │
-│  │ • Silero VAD (ort 2.0)        │     │ • Native Tool Registry (51)    │     │ • Direct PipeWire / pw-play   │  │
+│  │ • Silero VAD (ort 2.0)        │     │ • Native Tool Registry (55)    │     │ • Direct PipeWire / pw-play   │  │
 │  └───────────────────────────────┘     └───────────────┬────────────────┘     └───────────────────────────────┘  │
 │                                                        │                                                         │
 │                                                        ▼                                                         │
@@ -125,12 +125,19 @@
 - [x] **Omarchy Command Bridge**: Wrapper to execute Omarchy CLI commands and menu bar integration.
 - [x] **Screen Perception Tool**: Crop & capture active window or full screen via `grim` and multimodal vision.
 
-### Phase 3: AI Agent & 51 Tool Palettes ✅
+### Phase 3: AI Agent & 55 Tool Palettes ✅
 - [x] **Multi-Model Fallback Pool**: 5-tier Gemini & Groq fallback matrix with automatic failover on 429 quota limits.
-- [x] **51 Native Desktop Tools**: Complete suite covering Hyprland workspace management, media (MPRIS), virtual typing (`wtype`), keyboard shortcuts, calendar scheduling, email composition, notes, autonomous CLI coding, shell execution, clipboard, and system power.
+- [x] **55 Native Desktop Tools**: Complete suite covering Hyprland workspace management, media automation & MPRIS, virtual typing (`wtype`), keyboard shortcuts, calendar scheduling, email composition, notes, autonomous CLI coding, shell execution, clipboard, LocalSend sharing, Neovim research viewing, and system power.
 - [x] **Quickshell QML Wave HUD**: Fluid 60fps GPU-accelerated layer-shell HUD.
 
 ### Phase 4: Systems Hardening & Memory Optimization ✅
 - [x] **Zero-Spinning ONNX**: Eliminated thread pool spin loops (`with_spin_control(false)` and `with_intra_op_spinning(false)`).
 - [x] **mimalloc Integration**: Reduced heap retention and eliminated glibc multi-arena memory growth.
 - [x] **Dependency Deduplication**: Unified reqwest, hyper, and TLS stacks to v0.13.
+
+### Phase 5: Advanced Desktop Tooling & Visual Safety ✅
+- [x] **Themed Confirmation Modal TUI**: Interactive floating card (`TUI.float`) with active Omarchy colors, pill buttons, and auto-cancellation countdown for critical operations (shutdown, reboot, logout).
+- [x] **LocalSend First-Class Integration**: Instant local file, episode, clipboard, and screenshot transfer via `localsend_share` with automatic window focus.
+- [x] **Deep Research in Floating Neovim**: Comprehensive multi-section Markdown report viewer inside a centered floating Neovim modal (`display_research_in_neovim`).
+- [x] **TV Show & Media Automation**: Fuzzy-matching video playback (`play_media`) and history-backed resume (`resume_media`) via `mpv`.
+- [x] **Activity History & Logging**: Structured append-only execution log (`jarvis.log`) at `~/.local/state/jarvis/jarvis.log` with `jarvis -l`, `-l -f`, `--logs-path`.
