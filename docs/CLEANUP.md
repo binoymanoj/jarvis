@@ -23,9 +23,10 @@ This document details **every single file, configuration change, binary, cache, 
 1. **`~/.config/hypr/bindings.lua`**:
    Hyprland hotkeys:
    ```lua
-   -- Jarvis Voice Assistant (Push-to-Talk Hold / Toggle & Emergency Kill)
-   o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Hold/Toggle)", "/home/binoy/.local/bin/jarvis -t")
-   o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Release)", "/home/binoy/.local/bin/jarvis -s", { release = true })
+   -- Jarvis Voice Assistant (Wakeup / Push-to-Talk & Emergency Kill)
+   hl.unbind("SUPER + C")
+   o.bind("SUPER + C", "Jarvis Assistant (Hold/Toggle)", "/home/binoy/.local/bin/jarvis -t")
+   o.bind("SUPER + C", "Jarvis Assistant (Release)", "/home/binoy/.local/bin/jarvis -s", { release = true })
    o.bind("SUPER + ALT + ESCAPE", "Kill Jarvis Assistant", "/home/binoy/.local/bin/jarvis -k")
    ```
 2. **`~/.config/omarchy/plugins/top-bar/jarvis.qml`**:
@@ -76,8 +77,9 @@ rm -f /tmp/jarvis-*.pid /run/user/1000/jarvis-*.json
 Open `~/.config/hypr/bindings.lua` in your editor and remove the Jarvis binding block:
 ```lua
 -- Remove these lines:
-o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Hold/Toggle)", "/home/binoy/.local/bin/jarvis -t")
-o.bind("SUPER + SHIFT + RETURN", "Jarvis Assistant (Release)", "/home/binoy/.local/bin/jarvis -s", { release = true })
+hl.unbind("SUPER + C")
+o.bind("SUPER + C", "Jarvis Assistant (Hold/Toggle)", "/home/binoy/.local/bin/jarvis -t")
+o.bind("SUPER + C", "Jarvis Assistant (Release)", "/home/binoy/.local/bin/jarvis -s", { release = true })
 o.bind("SUPER + ALT + ESCAPE", "Kill Jarvis Assistant", "/home/binoy/.local/bin/jarvis -k")
 ```
 Reload Hyprland so the shortcut is freed immediately:

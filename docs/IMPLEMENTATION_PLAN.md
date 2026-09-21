@@ -27,7 +27,7 @@ Jarvis operates as a persistent user-level service (`systemd --user`) split into
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            USER INTERACTION LAYER                           │
-│  • Voice: Wake word ("Hey Jarvis") or Push-to-Talk hotkey (Super+Shift+Enter)│
+│  • Voice: Wake word ("Hey Jarvis") or Push-to-Talk hotkey (Super+C)         │
 │  • Omarchy Shell: Custom Quickshell top-bar widget / status visualizer      │
 │  • CLI Client: `jarvis -c "organize my workspace"`                          │
 │  • Wayland HUD: Transparent 15-bar glowing animated waveform                │

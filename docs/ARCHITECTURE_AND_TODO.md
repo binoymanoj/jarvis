@@ -3,7 +3,7 @@
 > **Project Target**: AI Desktop Voice Assistant ("Jarvis") natively integrated with Omarchy Linux & Hyprland.  
 > **Host Environment**: Omarchy Linux (Arch Linux base, Hyprland 0.56+, Quickshell 0.3.1, PipeWire, Intel Core i7-1185G7, 31 GB RAM).  
 > **Core Language**: **100% Native Rust** (`jarvis v0.2.0`) with Tokio Async Runtime, CPAL, and `mimalloc`.  
-> **Activation**: **Continuous Offline Wake Word ("Hey Jarvis")** + **Push-to-Talk Hotkey (`SUPER + SHIFT + ENTER`)**.  
+> **Activation**: **Continuous Offline Wake Word ("Hey Jarvis")** + **Push-to-Talk Hotkey (`SUPER + C`)**.  
 > **Emergency Kill Switch**: **`SUPER + ALT + ESCAPE`**  
 > **Full Performance & Specs Reference**: See [docs/PERFORMANCE_AND_SPECS.md](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)  
 > **Document Status**: Master architectural blueprint and living engineering roadmap.
@@ -29,7 +29,7 @@
 
 ```
                            ┌─────────────────────────────────────────────────────────┐
-                           │          KEYBIND TRIGGER: SUPER + SHIFT + ENTER         │
+                           │               KEYBIND TRIGGER: SUPER + C                │
                            └────────────────────────────┬────────────────────────────┘
                                                         │
                                                         ▼
@@ -95,7 +95,7 @@
 ## 4. Keybinding & Floating Wave HUD Architecture
 
 ### 4.1 Activation Flow
-1. User presses **`SUPER + SHIFT + ENTER`** anywhere in Hyprland or speaks **"Hey Jarvis"**.
+1. User presses **`SUPER + C`** anywhere in Hyprland or speaks **"Hey Jarvis"**.
 2. Keybind calls `jarvis -t` (toggles PTT listening mode).
 3. **Floating Transparent Animated Wave HUD appears** at the bottom-center of the screen:
    - Microphone streams to memory buffer via non-blocking PipeWire CPAL stream.

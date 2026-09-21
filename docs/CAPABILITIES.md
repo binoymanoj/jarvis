@@ -467,8 +467,7 @@ Clicking the menu bar icon reveals a floating `KeyboardPanel` popover offering q
 Configured natively in `~/.config/hypr/bindings.lua`:
 
 | Shortcut | Action | Description |
-| :--- | :--- | :--- |
-| **`SUPER + SHIFT + ENTER`** | **Push-to-Talk (Hold / Toggle)** | **Hold**: Hold while speaking, release to submit immediately.<br>**Tap**: Tap once to toggle continuous listening mode. |
+| **`SUPER + C`** | **Wakeup / Push-to-Talk (Hold / Toggle)** | **Hold**: Hold while speaking, release to submit immediately.<br>**Tap**: Tap once to toggle continuous listening mode. |
 | **`SUPER + ALT + ESCAPE`** | **Emergency Kill Switch** | Instantly silences audio, terminates active LLM thinking, cancels background tasks, and dismisses the HUD. |
 
 ---

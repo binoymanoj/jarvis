@@ -262,9 +262,10 @@ Add the following shortcuts to your Hyprland configuration.
 
 If you are using **Omarchy** (`~/.config/hypr/bindings.lua`):
 ```lua
--- Push-to-Talk: Press and hold to speak, release to process immediately
-o.bind("SUPER + SHIFT + RETURN", "Jarvis Voice Assistant (Hold/Toggle)", "jarvis -t")
-o.bind("SUPER + SHIFT + RETURN", "Jarvis Voice Assistant (Release)", "jarvis -s", { release = true })
+-- Wakeup / Push-to-Talk: Tap to toggle listening, or hold to speak and release
+hl.unbind("SUPER + C")
+o.bind("SUPER + C", "Jarvis Voice Assistant (Hold/Toggle)", "jarvis -t")
+o.bind("SUPER + C", "Jarvis Voice Assistant (Release)", "jarvis -s", { release = true })
 
 -- Emergency Kill Switch: Instantly silences speech, cancels commands, hides HUD
 o.bind("SUPER + ALT + ESCAPE", "Kill Jarvis Assistant", "jarvis -k")
@@ -272,9 +273,9 @@ o.bind("SUPER + ALT + ESCAPE", "Kill Jarvis Assistant", "jarvis -k")
 
 If you are using standard **`hyprland.conf`** (`~/.config/hypr/hyprland.conf`):
 ```conf
-# Push-to-Talk (Hold / Release)
-bind = SUPER SHIFT, Return, exec, jarvis -t
-bindr = SUPER SHIFT, Return, exec, jarvis -s
+# Wakeup / Push-to-Talk (Hold / Release)
+bind = SUPER, C, exec, jarvis -t
+bindr = SUPER, C, exec, jarvis -s
 
 # Emergency Kill Switch
 bind = SUPER ALT, Escape, exec, jarvis -k

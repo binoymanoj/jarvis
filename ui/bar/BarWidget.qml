@@ -448,7 +448,7 @@ BarWidget {
         Text {
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          text: "PTT: Super+Shift+Enter"
+          text: "PTT: Super+C"
           font.family: Style.font.family
           font.pixelSize: Style.font.caption
           color: Qt.darker(Color.popups.text, 1.5)

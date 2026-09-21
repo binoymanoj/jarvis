@@ -265,8 +265,8 @@ To dismiss Jarvis and conclude the conversation session, simply say:
 Jarvis will acknowledge with a polite farewell and cleanly hide the HUD overlay.
 
 ### Hardware Hotkeys & Emergency Stop
-* **`SUPER + SHIFT + RETURN`**: Push-to-talk key.
-  * Hold while speaking and release to submit immediately.
-  * Or tap once to toggle continuous conversational listening.
+* **`SUPER + C`**: Wakeup & Push-to-talk key.
+  * Tap once to toggle continuous conversational listening.
+  * Or hold while speaking and release to submit immediately.
 * **`SUPER + ALT + ESCAPE`**: Emergency kill switch.
   * Immediately silences audio output, cancels ongoing LLM requests, terminates active processes, and dismisses the HUD.

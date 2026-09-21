@@ -120,7 +120,7 @@ Configured in `~/.config/hypr/bindings.lua`:
 
 | Keybinding | Action | Description |
 | :--- | :--- | :--- |
-| `SUPER + SHIFT + ENTER` | **Push-to-Talk (Hold / Toggle)** | Press and hold to speak, release to send immediately. Or tap once to toggle continuous listening. |
+| `SUPER + C` | **Wakeup / Push-to-Talk (Hold / Toggle)** | Tap to toggle listening, or hold to speak and release to process immediately. |
 | `SUPER + ALT + ESCAPE` | **Emergency Kill Switch** | Instantly silences audio, terminates active thinking, and hides the HUD. |
 
 ---
