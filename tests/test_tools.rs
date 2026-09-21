@@ -119,10 +119,16 @@ fn test_calendar_date_parsing() {
 
 #[tokio::test]
 async fn test_localsend_share_tool_url() {
+    std::env::set_var("JARVIS_TEST_MODE", "1");
     let flag = Arc::new(AtomicBool::new(false));
     let settings = Settings::default();
     let reg = build_tool_registry(&settings, flag);
 
+    // Test missing parameter returns error
+    let err_res = reg.execute_tool("localsend_share", serde_json::json!({})).await;
+    assert!(err_res.is_err());
+
+    // Test URL sharing without opening GUI
     let res = reg
         .execute_tool(
             "localsend_share",
@@ -139,16 +145,30 @@ async fn test_localsend_share_tool_url() {
 
 #[tokio::test]
 async fn test_display_research_in_neovim_tool() {
+    std::env::set_var("JARVIS_TEST_MODE", "1");
     let flag = Arc::new(AtomicBool::new(false));
     let settings = Settings::default();
     let reg = build_tool_registry(&settings, flag);
 
-    let res = reg.execute_tool("display_research_in_neovim", serde_json::json!({
-        "title": "Quantum Computing",
-        "content": "## Quantum Superposition\nQubits can exist in coherent superpositions of states."
-    })).await;
+    // Test missing parameter returns error
+    let err_res = reg
+        .execute_tool("display_research_in_neovim", serde_json::json!({ "title": "Test" }))
+        .await;
+    assert!(err_res.is_err());
+
+    // Test research formatting without opening terminal popup
+    let res = reg
+        .execute_tool(
+            "display_research_in_neovim",
+            serde_json::json!({
+                "title": "Quantum Computing",
+                "content": "## Quantum Superposition\nQubits can exist in coherent superpositions of states."
+            }),
+        )
+        .await;
 
     assert!(res.is_ok());
     let msg = res.unwrap();
     assert!(msg.contains("Quantum Computing"));
 }
+

@@ -1,4 +1,5 @@
 use crate::core::error::{JarvisError, Result};
+use crate::core::is_test_environment;
 use crate::tools::hyprland::HyprlandController;
 use crate::tools::Tool;
 use async_trait::async_trait;
@@ -430,6 +431,21 @@ impl LocalSendManager {
         let target = self.resolve_target(item, item_type).await?;
 
         info!("LocalSend sharing target: {:?}", target);
+
+        if is_test_environment() {
+            let result_message = match target {
+                ShareTarget::File(ref path) => {
+                    let fname = path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    format!("Shared '{fname}' to LocalSend sending window.")
+                }
+                ShareTarget::Text(_) => "Shared text to LocalSend sending window.".to_string(),
+            };
+            return Ok(result_message);
+        }
 
         // If target_device is specified and localsend-cli is available, we can invoke CLI directly
         if let Some(dev) = target_device {

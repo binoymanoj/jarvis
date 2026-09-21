@@ -1,4 +1,5 @@
 use crate::core::error::{JarvisError, Result};
+use crate::core::is_test_environment;
 use crate::tools::Tool;
 use crate::ui::theme::load_omarchy_theme;
 use async_trait::async_trait;
@@ -93,6 +94,12 @@ impl ResearchManager {
             "Launching floating Neovim popup for '{}' at {:?} (theme bg: {})",
             title, filepath, theme.dark_background
         );
+
+        if is_test_environment() {
+            return Ok(format!(
+                "Opened research on '{title}' in floating Neovim popup."
+            ));
+        }
 
         let nvim_args = [
             "-R", // Read-only view
