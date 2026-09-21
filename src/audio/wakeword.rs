@@ -1,5 +1,4 @@
 use crate::audio::capture::AudioCapture;
-use crate::audio::playback::play_wake_chime;
 use crate::core::config::Settings;
 use ndarray::{Array2, Array3, Array4};
 use ort::session::Session;
@@ -342,7 +341,6 @@ impl WakeWordDetector {
             // Check manual trigger hotkey / menubar signal
             if manual_trigger.swap(false, Ordering::SeqCst) {
                 info!("External trigger received! Activating voice loop...");
-                play_wake_chime().await;
                 pause_signal.store(true, Ordering::SeqCst);
                 on_detected().await;
                 self.reset();
@@ -351,9 +349,16 @@ impl WakeWordDetector {
                 continue;
             }
 
-            if pause_signal.load(Ordering::SeqCst) {
+            let mut paused_count = 0;
+            while pause_signal.load(Ordering::SeqCst) && !stop_signal.load(Ordering::SeqCst) {
                 sleep(Duration::from_millis(100)).await;
-                continue;
+                paused_count += 1;
+                if paused_count >= 450 {
+                    warn!("Wake word listener pause_signal was stuck for >45s. Auto-recovering listener...");
+                    pause_signal.store(false, Ordering::SeqCst);
+                    crate::core::state::ensure_idle();
+                    break;
+                }
             }
 
             let (_stream, mut rx) = match capture.start_stream(chunk_size) {
@@ -370,7 +375,6 @@ impl WakeWordDetector {
                     info!("External trigger received! Activating voice loop...");
                     drop(_stream);
                     sleep(Duration::from_millis(50)).await;
-                    play_wake_chime().await;
                     pause_signal.store(true, Ordering::SeqCst);
                     on_detected().await;
                     self.reset();
@@ -394,7 +398,6 @@ impl WakeWordDetector {
                     );
                     drop(_stream); // Release mic stream for conversational recording turn
                     sleep(Duration::from_millis(50)).await;
-                    play_wake_chime().await;
                     pause_signal.store(true, Ordering::SeqCst);
                     on_detected().await;
                     self.reset();

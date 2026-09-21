@@ -6,7 +6,7 @@ use crate::audio::tts::TextToSpeech;
 use crate::audio::wakeword::WakeWordDetector;
 use crate::cli::args::CliArgs;
 use crate::core::config::Settings;
-use crate::core::error::Result;
+use crate::core::error::{JarvisError, Result};
 use crate::core::state::{
     clear_busy, daemon_pid_file_path, is_pid_running, pid_file_path, read_pid, read_status,
     remove_file_if_exists, set_idle, set_processing, set_recording, set_speaking, update_status,
@@ -162,7 +162,11 @@ pub async fn run_command_headless(
     let agent = JarvisAgent::new(settings);
     let reply_res = agent.process_prompt(prompt).await;
 
-    match reply_res {
+    let daemon_alive = read_pid(&daemon_pid_file_path())
+        .map(is_pid_running)
+        .unwrap_or(false);
+
+    let res = match reply_res {
         Ok(reply) => {
             if TaskNotifier::global().is_active() {
                 TaskNotifier::global().finish_smart(&reply).await;
@@ -173,7 +177,7 @@ pub async fn run_command_headless(
 
             if speak_reply {
                 let tts = TextToSpeech::from_settings(settings);
-                tts.speak(&reply).await?;
+                let _ = tts.speak(&reply).await;
             }
             Ok(())
         }
@@ -182,7 +186,10 @@ pub async fn run_command_headless(
             clear_busy();
             Err(e)
         }
-    }
+    };
+
+    set_idle(daemon_alive);
+    res
 }
 
 pub async fn run_voice_activation(
@@ -235,7 +242,7 @@ pub async fn run_voice_activation(
         // Step 2: Record speech with real-time volume callback
         let mut last_vol_time = Instant::now();
 
-        let wav_bytes = recorder
+        let wav_res = recorder
             .record_phrase(
                 Some(move |volume| {
                     if last_vol_time.elapsed() >= Duration::from_millis(50) {
@@ -250,7 +257,15 @@ pub async fn run_voice_activation(
                 Some(initial_timeout),
                 Some(force_submit_event.clone()),
             )
-            .await?;
+            .await;
+
+        let wav_bytes = match wav_res {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("Audio recording error: {e}");
+                break;
+            }
+        };
 
         if cancel_event.load(Ordering::SeqCst) {
             info!("Voice activation cancelled during recording.");
@@ -270,11 +285,40 @@ pub async fn run_voice_activation(
         set_processing("Transcribing...");
         hud.show_thinking(Some("Transcribing...")).await;
 
-        let transcript = stt.transcribe(&wav_bytes).await?;
+        let cancel_stt = cancel_event.clone();
+        let transcript_res = tokio::select! {
+            res = stt.transcribe(&wav_bytes) => res,
+            _ = async {
+                while !cancel_stt.load(Ordering::SeqCst) {
+                    sleep(Duration::from_millis(50)).await;
+                }
+            } => {
+                info!("Transcription cancelled by user.");
+                break;
+            }
+            _ = sleep(Duration::from_secs(15)) => {
+                warn!("Speech-to-Text timed out after 15s.");
+                Err(JarvisError::Timeout(15))
+            }
+        };
 
         if cancel_event.load(Ordering::SeqCst) {
             break;
         }
+
+        let transcript = match transcript_res {
+            Ok(t) => t,
+            Err(e) => {
+                warn!("Transcription error: {e}");
+                let msg = "I had trouble transcribing your audio, sir.";
+                set_speaking(msg);
+                hud.show_speaking(Some(msg)).await;
+                if let Some(ref t) = tts {
+                    let _ = t.speak(msg).await;
+                }
+                break;
+            }
+        };
 
         if transcript.trim().is_empty() {
             if is_first_turn {
@@ -306,14 +350,33 @@ pub async fn run_voice_activation(
             break;
         }
 
-        // Step 5: Process through Gemini Flash agent
+        // Step 5: Process through Gemini Flash agent with cancellation and timeout protection
         if cancel_event.load(Ordering::SeqCst) {
             TaskNotifier::global().cancel().await;
             clear_busy();
             break;
         }
 
-        let reply_res = agent.process_prompt(&transcript).await;
+        let cancel_prompt = cancel_event.clone();
+        let reply_res = tokio::select! {
+            res = agent.process_prompt(&transcript) => res,
+            _ = async {
+                while !cancel_prompt.load(Ordering::SeqCst) {
+                    sleep(Duration::from_millis(50)).await;
+                }
+            } => {
+                info!("Turn cancelled by user during processing.");
+                TaskNotifier::global().cancel().await;
+                clear_busy();
+                break;
+            }
+            _ = sleep(Duration::from_secs(45)) => {
+                warn!("Agent prompt processing timed out after 45s.");
+                TaskNotifier::global().cancel().await;
+                clear_busy();
+                Err(JarvisError::Timeout(45))
+            }
+        };
 
         if cancel_event.load(Ordering::SeqCst) {
             TaskNotifier::global().cancel().await;
@@ -330,9 +393,17 @@ pub async fn run_voice_activation(
                 r
             }
             Err(e) => {
+                warn!("Prompt processing error: {e}");
                 TaskNotifier::global().cancel().await;
                 clear_busy();
-                return Err(e);
+                let err_msg = "I encountered an error processing your request, sir.";
+                println!("\x1b[1;31m󰚩 Jarvis Error:\x1b[0m {e}");
+                set_speaking(err_msg);
+                hud.show_speaking(Some(err_msg)).await;
+                if let Some(ref t) = tts {
+                    let _ = t.speak(err_msg).await;
+                }
+                break;
             }
         };
 
@@ -409,6 +480,7 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
     let sig_force = force_submit.clone();
     let sig_cancel = cancel_event.clone();
     let sig_manual = manual_trigger.clone();
+    let sig_pause = pause_signal.clone();
 
     tokio::spawn(async move {
         while let Some(sig) = signal_handler.recv().await {
@@ -420,17 +492,31 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
                 }
                 DaemonSignal::TogglePtt => {
                     let st = read_status();
-                    if st.state == "recording" {
+                    let is_turn_active = sig_pause.load(Ordering::SeqCst);
+
+                    if is_turn_active && st.state == "recording" {
                         info!("SIGUSR2: Finalizing recording.");
                         sig_force.store(true, Ordering::SeqCst);
-                    } else if st.state == "processing" || st.state == "speaking" {
-                        info!("SIGUSR2: Interrupting active turn.");
+                    } else if is_turn_active && (st.state == "processing" || st.state == "speaking") {
+                        info!("SIGUSR2: Interrupting active turn and re-arming listening.");
                         sig_cancel.store(true, Ordering::SeqCst);
                         let _ = Command::new("pkill").arg("-9").arg("pw-play").output();
                         let h = JarvisHUD::new();
-                        h.hide().await;
+                        tokio::spawn(async move {
+                            h.hide().await;
+                        });
+                        tokio::spawn(async move {
+                            TaskNotifier::global().cancel().await;
+                        });
+                        clear_busy();
+                        set_idle(true);
+                        sig_manual.store(true, Ordering::SeqCst);
                     } else {
                         info!("SIGUSR2: Triggering voice activation.");
+                        clear_busy();
+                        set_idle(true);
+                        sig_cancel.store(false, Ordering::SeqCst);
+                        sig_force.store(false, Ordering::SeqCst);
                         sig_manual.store(true, Ordering::SeqCst);
                     }
                 }
@@ -443,7 +529,13 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
                     sig_cancel.store(true, Ordering::SeqCst);
                     let _ = Command::new("pkill").arg("-9").arg("pw-play").output();
                     let h = JarvisHUD::new();
-                    h.hide().await;
+                    tokio::spawn(async move {
+                        h.hide().await;
+                    });
+                    tokio::spawn(async move {
+                        TaskNotifier::global().cancel().await;
+                    });
+                    clear_busy();
                     set_idle(true);
                 }
             }

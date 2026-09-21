@@ -158,6 +158,28 @@ pub fn clear_busy() {
     update_status(|s| {
         s.is_busy = false;
         s.current_task.clear();
+        if s.state == "processing" {
+            s.state = if s.daemon_running {
+                "wakeword".to_string()
+            } else {
+                "idle".to_string()
+            };
+            s.active = false;
+        }
+    });
+}
+
+pub fn ensure_idle() {
+    update_status(|s| {
+        s.is_busy = false;
+        s.active = false;
+        s.current_task.clear();
+        s.mic_active = false;
+        s.state = if s.daemon_running {
+            "wakeword".to_string()
+        } else {
+            "idle".to_string()
+        };
     });
 }
 

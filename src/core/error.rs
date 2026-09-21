@@ -65,6 +65,9 @@ pub enum JarvisError {
     #[error("Dismissal / exit requested by user: {0}")]
     Exit(String),
 
+    #[error("Operation interrupted: {0}")]
+    Interrupted(String),
+
     #[error("{0}")]
     Other(String),
 }

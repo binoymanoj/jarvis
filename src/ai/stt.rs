@@ -14,8 +14,13 @@ impl SpeechToText {
     pub fn new(api_key: Option<String>, model: Option<String>) -> Self {
         let key = api_key.unwrap_or_default().trim().to_string();
         let model_name = model.unwrap_or_else(|| "whisper-large-v3-turbo".to_string());
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default();
         Self {
-            client: Client::builder().build().unwrap_or_default(),
+            client,
             api_key: key,
             model: model_name,
         }

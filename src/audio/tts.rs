@@ -131,14 +131,21 @@ impl TextToSpeech {
             volume: 0,
         };
 
-        let mut client = msedge_tts::tts::client::tokio_runtime::connect_async()
-            .await
-            .map_err(|e| JarvisError::Tts(format!("Failed to connect to Edge TTS: {e}")))?;
+        let mut client = tokio::time::timeout(
+            std::time::Duration::from_secs(6),
+            msedge_tts::tts::client::tokio_runtime::connect_async(),
+        )
+        .await
+        .map_err(|_| JarvisError::Tts("Edge TTS connection timed out after 6s".to_string()))?
+        .map_err(|e| JarvisError::Tts(format!("Failed to connect to Edge TTS: {e}")))?;
 
-        let audio = client
-            .synthesize(text, &config)
-            .await
-            .map_err(|e| JarvisError::Tts(format!("Edge TTS synthesis failed: {e}")))?;
+        let audio = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            client.synthesize(text, &config),
+        )
+        .await
+        .map_err(|_| JarvisError::Tts("Edge TTS synthesis timed out after 15s".to_string()))?
+        .map_err(|e| JarvisError::Tts(format!("Edge TTS synthesis failed: {e}")))?;
 
         let tmp_mp3 = PathBuf::from("/tmp/jarvis_speech.mp3");
         tokio::fs::write(&tmp_mp3, &audio.audio_bytes).await?;
@@ -151,12 +158,16 @@ impl TextToSpeech {
             .or_else(|_| which::which("aplay"))
             .unwrap_or_else(|_| PathBuf::from("pw-play"));
 
-        let status = Command::new(&pw_play)
-            .arg(path)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await?;
+        let status = tokio::time::timeout(
+            std::time::Duration::from_secs(45),
+            Command::new(&pw_play)
+                .arg(path)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status(),
+        )
+        .await
+        .map_err(|_| JarvisError::Audio("pw-play playback timed out after 45s".to_string()))??;
 
         if status.success() {
             Ok(())

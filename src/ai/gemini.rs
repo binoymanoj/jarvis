@@ -75,9 +75,17 @@ pub struct GeminiClient {
 }
 
 impl GeminiClient {
+    fn build_client() -> Client {
+        Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
+    }
+
     pub fn new(api_key: &str) -> Self {
         Self {
-            client: Client::builder().build().unwrap_or_default(),
+            client: Self::build_client(),
             api_key: api_key.trim().to_string(),
             base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
         }
@@ -85,7 +93,7 @@ impl GeminiClient {
 
     pub fn with_base_url(api_key: &str, base_url: &str) -> Self {
         Self {
-            client: Client::builder().build().unwrap_or_default(),
+            client: Self::build_client(),
             api_key: api_key.trim().to_string(),
             base_url: base_url.trim_end_matches('/').to_string(),
         }

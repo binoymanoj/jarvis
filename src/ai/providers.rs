@@ -33,8 +33,13 @@ pub struct OpenAICompatibleClient {
 
 impl OpenAICompatibleClient {
     pub fn new(provider_name: &str, api_key: &str, base_url: &str) -> Self {
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default();
         Self {
-            client: Client::builder().build().unwrap_or_default(),
+            client,
             api_key: api_key.trim().to_string(),
             base_url: base_url.trim_end_matches('/').to_string(),
             provider_name: provider_name.to_string(),
@@ -167,8 +172,13 @@ pub struct AnthropicClient {
 
 impl AnthropicClient {
     pub fn new(api_key: &str) -> Self {
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default();
         Self {
-            client: Client::builder().build().unwrap_or_default(),
+            client,
             api_key: api_key.trim().to_string(),
             base_url: "https://api.anthropic.com/v1".to_string(),
         }

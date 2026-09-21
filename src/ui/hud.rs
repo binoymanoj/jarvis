@@ -75,16 +75,20 @@ impl JarvisHUD {
         }
 
         // 1. Try pinging existing instance
-        if let Ok(output) = Command::new(&self.qs_bin)
-            .arg("ipc")
-            .arg("-p")
-            .arg(&self.ui_path)
-            .arg("call")
-            .arg("jarvis")
-            .arg("ping")
-            .output()
-            .await
-        {
+        let ping_res = tokio::time::timeout(
+            Duration::from_millis(500),
+            Command::new(&self.qs_bin)
+                .arg("ipc")
+                .arg("-p")
+                .arg(&self.ui_path)
+                .arg("call")
+                .arg("jarvis")
+                .arg("ping")
+                .output(),
+        )
+        .await;
+
+        if let Ok(Ok(output)) = ping_res {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if stdout.contains("pong") {
                 self.is_started.store(true, Ordering::SeqCst);
@@ -102,22 +106,25 @@ impl JarvisHUD {
         }
 
         debug!("Spawning Quickshell HUD daemon from {:?}", self.ui_path);
-        let launch = Command::new(&self.qs_bin)
-            .arg("-d")
-            .arg("-n")
-            .arg("-p")
-            .arg(&self.ui_path)
-            .output()
-            .await;
+        let launch = tokio::time::timeout(
+            Duration::from_millis(1500),
+            Command::new(&self.qs_bin)
+                .arg("-d")
+                .arg("-n")
+                .arg("-p")
+                .arg(&self.ui_path)
+                .output(),
+        )
+        .await;
 
         match launch {
-            Ok(_) => {
+            Ok(Ok(_)) => {
                 sleep(Duration::from_millis(250)).await;
                 self.is_started.store(true, Ordering::SeqCst);
                 true
             }
-            Err(e) => {
-                warn!("Failed to launch Quickshell HUD: {e}");
+            _ => {
+                self.is_started.store(false, Ordering::SeqCst);
                 false
             }
         }
@@ -141,12 +148,24 @@ impl JarvisHUD {
             cmd.arg(arg);
         }
 
-        let output = cmd.output().await.map_err(JarvisError::Io)?;
-        if !output.status.success() {
-            self.is_started.store(false, Ordering::SeqCst);
+        let output_res = tokio::time::timeout(Duration::from_secs(2), cmd.output()).await;
+        match output_res {
+            Ok(Ok(output)) => {
+                if !output.status.success() {
+                    self.is_started.store(false, Ordering::SeqCst);
+                }
+                Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            }
+            Ok(Err(e)) => {
+                self.is_started.store(false, Ordering::SeqCst);
+                Err(JarvisError::Io(e))
+            }
+            Err(_) => {
+                warn!("Quickshell HUD IPC call '{method}' timed out after 2s");
+                self.is_started.store(false, Ordering::SeqCst);
+                Ok(String::new())
+            }
         }
-
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
     /// Sync currently active Omarchy theme colors with the HUD
