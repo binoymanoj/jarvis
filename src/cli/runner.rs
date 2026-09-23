@@ -10,8 +10,8 @@ use crate::core::config::Settings;
 use crate::core::error::{JarvisError, Result};
 use crate::core::state::{
     clear_busy, daemon_pid_file_path, is_pid_running, pid_file_path, read_pid, read_status,
-    remove_file_if_exists, set_idle, set_processing, set_recording, set_speaking, update_status,
-    write_pid,
+    remove_file_if_exists, set_idle, set_processing, set_recording, set_speaking,
+    sync_with_settings, update_status, write_pid,
 };
 use crate::tools::hyprland::HyprlandController;
 use crate::tools::workflow::WorkflowManager;
@@ -155,8 +155,12 @@ pub fn restart_all() {
 pub async fn run_command_headless(
     prompt: &str,
     speak_reply: bool,
-    settings: &Settings,
+    initial_settings: &Settings,
 ) -> Result<()> {
+    let fresh_settings = Settings::load().unwrap_or_else(|_| initial_settings.clone());
+    let settings = &fresh_settings;
+    sync_with_settings(settings);
+
     info!("Headless command received: \"{prompt}\"");
     set_processing(prompt);
 
@@ -198,8 +202,12 @@ pub async fn run_voice_activation(
     is_daemon: bool,
     cancel_event: Arc<AtomicBool>,
     force_submit_event: Arc<AtomicBool>,
-    settings: &Settings,
+    initial_settings: &Settings,
 ) -> Result<()> {
+    let fresh_settings = Settings::load().unwrap_or_else(|_| initial_settings.clone());
+    let settings = &fresh_settings;
+    sync_with_settings(settings);
+
     let hud = Arc::new(JarvisHUD::new());
     let recorder = AudioRecorder::from_settings(settings);
     let stt = SpeechToText::from_settings(settings);
@@ -462,10 +470,14 @@ pub async fn run_daemon(speak_reply: bool, settings: &Settings) -> Result<()> {
     }
     write_pid(&pid_path)?;
 
+    let initial_settings = Settings::load().unwrap_or_else(|_| settings.clone());
+    let settings = &initial_settings;
+
     update_status(|s| {
         s.daemon_running = true;
         s.state = "wakeword".to_string();
-        s.wakeword_enabled = true;
+        s.wakeword_enabled = settings.wakeword_enabled;
+        s.cli_tool = settings.cli_ai_tool.clone();
     });
 
     let mut detector = WakeWordDetector::new(settings);

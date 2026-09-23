@@ -38,7 +38,7 @@ impl Default for Status {
             state: "idle".to_string(),
             mic_active: false,
             wakeword_enabled: true,
-            cli_tool: "claude".to_string(),
+            cli_tool: "agy".to_string(),
             last_transcript: String::new(),
             last_reply: String::new(),
             updated_at: now,

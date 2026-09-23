@@ -23,7 +23,7 @@ groq_api_key = ""
 openrouter_api_key = ""
 
 # Autonomous coding CLI assistant ("claude", "codex", "agy")
-cli_tool = "claude"
+cli_tool = "agy"
 
 [wakeword]
 # Background wake word detection active in daemon

@@ -172,7 +172,7 @@ impl Default for Settings {
             anthropic_api_key: None,
             groq_api_key: None,
             openrouter_api_key: None,
-            cli_ai_tool: "claude".to_string(),
+            cli_ai_tool: "agy".to_string(),
             editor: "nvim".to_string(),
             terminal: "kitty".to_string(),
             project_dirs: vec![
@@ -235,7 +235,7 @@ groq_api_key = ""
 openrouter_api_key = ""
 
 # Autonomous coding CLI assistant ("claude", "codex", "agy")
-cli_tool = "claude"
+cli_tool = "agy"
 
 [wakeword]
 # Background wake word detection
