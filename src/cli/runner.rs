@@ -1,5 +1,6 @@
 use crate::ai::stt::SpeechToText;
 use crate::ai::{is_exit_command, JarvisAgent};
+use crate::audio::ducking::AudioDucker;
 use crate::audio::playback::play_wake_chime;
 use crate::audio::recorder::AudioRecorder;
 use crate::audio::tts::TextToSpeech;
@@ -239,6 +240,10 @@ pub async fn run_voice_activation(
             settings.followup_listen_timeout
         };
 
+        // Duck/mute audio output during speech recording to avoid speaker bleed
+        let ducker = AudioDucker::from_settings(settings);
+        ducker.duck().await;
+
         // Step 2: Record speech with real-time volume callback
         let mut last_vol_time = Instant::now();
 
@@ -258,6 +263,9 @@ pub async fn run_voice_activation(
                 Some(force_submit_event.clone()),
             )
             .await;
+
+        // Restore audio output volume/unmute immediately when recording ends
+        ducker.restore().await;
 
         let wav_bytes = match wav_res {
             Ok(b) => b,

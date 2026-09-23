@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 pub mod capture;
+pub mod ducking;
 pub mod playback;
 pub mod recorder;
 pub mod tts;
@@ -8,6 +9,7 @@ pub mod vad;
 pub mod wakeword;
 
 pub use capture::AudioCapture;
+pub use ducking::{AudioDucker, DuckMode};
 pub use playback::{ensure_chime_file, play_audio_file, play_wake_chime};
 pub use recorder::AudioRecorder;
 pub use tts::TextToSpeech;

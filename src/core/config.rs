@@ -65,6 +65,8 @@ pub struct TomlAudioConfig {
     pub max_recording_seconds: Option<f32>,
     pub initial_listen_timeout: Option<f32>,
     pub followup_listen_timeout: Option<f32>,
+    pub duck_media: Option<bool>,
+    pub duck_mode: Option<String>,
 }
 
 // -----------------------------------------------------------------------------
@@ -109,6 +111,8 @@ pub struct Settings {
     pub max_recording_seconds: f32,
     pub initial_listen_timeout: f32,
     pub followup_listen_timeout: f32,
+    pub duck_media: bool,
+    pub duck_mode: String,
 
     // Wake Word Detection
     pub wakeword_enabled: bool,
@@ -189,6 +193,8 @@ impl Default for Settings {
             max_recording_seconds: 25.0,
             initial_listen_timeout: 10.0,
             followup_listen_timeout: 8.0,
+            duck_media: true,
+            duck_mode: "mute".to_string(),
             wakeword_enabled: true,
             wakeword_name: "hey jarvis".to_string(),
             wakeword_model: "hey_jarvis_v0.1.onnx".to_string(),
@@ -277,6 +283,12 @@ silence_threshold_seconds = 1.3
 initial_listen_timeout = 10.0
 followup_listen_timeout = 8.0
 max_recording_seconds = 25.0
+
+# Automatic audio ducking during voice capture (prevents speaker acoustic bleed into microphone)
+# duck_media: true to automatically duck/mute speakers while you are speaking
+# duck_mode: "mute" (zero bleed, instant silence detection) or "lower" (reduces volume to 15%)
+duck_media = true
+duck_mode = "mute"
 "#;
 
 impl Settings {
@@ -409,6 +421,12 @@ impl Settings {
         }
         if let Ok(val) = env::var("JARVIS_TTS_ENGINE") {
             s.tts_engine = val;
+        }
+        if let Ok(val) = env::var("JARVIS_DUCK_MEDIA") {
+            s.duck_media = val.to_lowercase() == "true" || val == "1";
+        }
+        if let Ok(val) = env::var("JARVIS_DUCK_MODE") {
+            s.duck_mode = val;
         }
         if let Ok(val) = env::var("JARVIS_WAKEWORD_ENABLED") {
             s.wakeword_enabled = val.to_lowercase() == "true" || val == "1";
@@ -572,6 +590,12 @@ impl Settings {
             if let Some(flt) = aud.followup_listen_timeout {
                 s.followup_listen_timeout = flt;
             }
+            if let Some(dm) = aud.duck_media {
+                s.duck_media = dm;
+            }
+            if let Some(dmode) = aud.duck_mode {
+                s.duck_mode = dmode;
+            }
         }
 
         // Merge Media settings from TOML
@@ -664,6 +688,8 @@ mod tests {
         assert!(settings.wakeword_enabled);
         assert_eq!(settings.wakeword_name, "hey jarvis");
         assert_eq!(settings.wakeword_threshold, 0.50);
+        assert!(settings.duck_media);
+        assert_eq!(settings.duck_mode, "mute");
     }
 
     #[test]

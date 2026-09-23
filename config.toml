@@ -71,3 +71,10 @@ silence_threshold_seconds = 1.3
 initial_listen_timeout = 10.0
 followup_listen_timeout = 8.0
 max_recording_seconds = 25.0
+
+# Automatic audio ducking during voice capture (prevents speaker acoustic bleed into microphone)
+# duck_media: true to automatically duck/mute speakers while you are speaking
+# duck_mode: "mute" (zero bleed, instant silence detection) or "lower" (reduces volume to 15%)
+duck_media = true
+duck_mode = "mute"
+
