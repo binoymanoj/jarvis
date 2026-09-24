@@ -6,7 +6,7 @@ use crate::ai::gemini::{
 use crate::ai::jev::{FastPathAction, FastPathRouter};
 use crate::ai::providers::AIClient;
 use crate::core::config::Settings;
-use crate::core::error::{JarvisError, Result};
+use crate::core::error::Result;
 use crate::tools::hyprland::HyprlandController;
 use crate::tools::screen::ScreenPerception;
 use crate::tools::{build_tool_registry, ToolRegistry};
@@ -385,7 +385,7 @@ impl JarvisAgent {
 
             let mut tool_turn = 0;
             let mut model_succeeded = false;
-            let mut quota_exceeded = false;
+            let mut should_fallback = false;
             let mut final_text_reply = String::new();
 
             while tool_turn < MAX_TOOL_TURNS {
@@ -409,16 +409,16 @@ impl JarvisAgent {
 
                 let response = match client.generate_content(&active_model, &request).await {
                     Ok(resp) => resp,
-                    Err(JarvisError::QuotaExceeded(m)) => {
-                        warn!("Quota limit hit on model {m}");
-                        quota_exceeded = true;
+                    Err(e) if e.is_model_failover() => {
+                        warn!(
+                            "Model '{active_model}' capacity/availability issue ({e}). Triggering failover..."
+                        );
+                        should_fallback = true;
                         break;
                     }
                     Err(e) => {
                         error!("Error during agent reasoning with {active_model}: {e}");
-                        return Ok(format!(
-                            "I encountered an issue processing your request: {e}"
-                        ));
+                        return Ok(e.user_friendly_message().to_string());
                     }
                 };
 
@@ -521,14 +521,22 @@ impl JarvisAgent {
                 return Ok(final_text_reply);
             }
 
-            if quota_exceeded {
+            if should_fallback {
                 let mut fb = self.fallback.lock().await;
                 if let Some(next_model) = fb.next_fallback() {
-                    warn!("Failing over to next fallback model: {next_model}");
+                    let next_str = next_model.to_string();
+                    warn!(
+                        "Failing over from '{active_model}' to next fallback model [{}/{}]: '{next_str}'",
+                        fb.current_index() + 1,
+                        fb.all_models().len()
+                    );
                     continue;
                 } else {
-                    error!("All fallback model quotas have been exhausted.");
-                    return Ok("All model quota limits have been temporarily exceeded, sir. Please retry in a few moments.".to_string());
+                    error!("All fallback model tiers have been exhausted.");
+                    return Ok(
+                        "All AI models are currently experiencing high demand or quota limits, sir. Please retry in a few moments."
+                            .to_string(),
+                    );
                 }
             }
 

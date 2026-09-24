@@ -1,10 +1,10 @@
 use tracing::{info, warn};
 
 pub const DEFAULT_FALLBACK_MODELS: &[&str] = &[
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
     "gemini-flash-latest",
     "gemini-flash-lite-latest",
 ];
@@ -17,7 +17,7 @@ pub struct FallbackCoordinator {
 
 impl FallbackCoordinator {
     pub fn new(primary_model: Option<&str>, fallback_models: Option<Vec<String>>) -> Self {
-        let primary = primary_model.unwrap_or("gemini-3.5-flash-lite");
+        let primary = primary_model.unwrap_or("gemini-2.5-flash");
         let mut models = vec![primary.to_string()];
 
         let defaults = match fallback_models {
@@ -38,6 +38,11 @@ impl FallbackCoordinator {
             models,
             current_index: 0,
         }
+    }
+
+    /// Current model index in fallback list
+    pub fn current_index(&self) -> usize {
+        self.current_index
     }
 
     /// Get current active model name

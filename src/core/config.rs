@@ -168,7 +168,7 @@ impl Default for Settings {
         let username = env::var("USER").unwrap_or_else(|_| "user".to_string());
         Self {
             ai_provider: "gemini".to_string(),
-            model_name: "gemini-3.5-flash-lite".to_string(),
+            model_name: "gemini-2.5-flash".to_string(),
             gemini_api_key: None,
             openai_api_key: None,
             anthropic_api_key: None,
@@ -223,12 +223,12 @@ pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"# =================================
 provider = "gemini"
 
 # Model name for chosen provider:
-# - Gemini: "gemini-3.5-flash-lite", "gemini-2.5-flash"
+# - Gemini: "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"
 # - OpenAI: "gpt-4o", "gpt-4o-mini"
 # - Anthropic: "claude-3-7-sonnet-latest", "claude-3-5-haiku-latest"
 # - Groq: "llama-3.3-70b-versatile"
 # - OpenRouter: "anthropic/claude-3.7-sonnet", "deepseek/deepseek-r1"
-model = "gemini-3.5-flash-lite"
+model = "gemini-2.5-flash"
 
 # Provider API Keys (Leave blank if already defined in environment or .env)
 gemini_api_key = ""
@@ -700,7 +700,7 @@ mod tests {
         assert_eq!(settings.terminal, "kitty");
         assert_eq!(settings.sample_rate, 16000);
         assert_eq!(settings.channels, 1);
-        assert_eq!(settings.model_name, "gemini-3.5-flash-lite");
+        assert_eq!(settings.model_name, "gemini-2.5-flash");
         assert!(settings.wakeword_enabled);
         assert_eq!(settings.wakeword_name, "hey jarvis");
         assert_eq!(settings.wakeword_threshold, 0.50);
