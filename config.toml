@@ -22,6 +22,9 @@ anthropic_api_key = ""
 groq_api_key = ""
 openrouter_api_key = ""
 
+# TypeSafe AI Jev (Fast-Path 70ms intent routing and type-safe decisions)
+typesafe_api_key = ""
+
 # Autonomous coding CLI assistant ("claude", "codex", "agy")
 cli_tool = "agy"
 
@@ -67,7 +70,7 @@ edge_voice = "en-GB-RyanNeural"
 piper_voice = "en_GB-alan-medium"
 
 # VAD and Silence detection
-silence_threshold_seconds = 1.3
+silence_threshold_seconds = 0.85
 initial_listen_timeout = 10.0
 followup_listen_timeout = 8.0
 max_recording_seconds = 25.0

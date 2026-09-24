@@ -3,6 +3,7 @@ use crate::ai::gemini::{
     ContentMessage, GeminiClient, GenerateContentRequest, GenerationConfig, SystemInstruction,
     SystemPart,
 };
+use crate::ai::jev::{FastPathAction, FastPathRouter};
 use crate::ai::providers::AIClient;
 use crate::core::config::Settings;
 use crate::core::error::{JarvisError, Result};
@@ -176,6 +177,7 @@ pub struct JarvisAgent {
     ai_client: Option<AIClient>,
     gemini_client: Option<GeminiClient>,
     fallback: Arc<Mutex<FallbackCoordinator>>,
+    fast_router: FastPathRouter,
     registry: Arc<ToolRegistry>,
     hyprland: Arc<HyprlandController>,
     screen: Arc<ScreenPerception>,
@@ -198,6 +200,7 @@ impl JarvisAgent {
         let registry = Arc::new(build_tool_registry(settings, session_ended.clone()));
         let hyprland = Arc::new(HyprlandController::new());
         let screen = Arc::new(ScreenPerception::new(hyprland.clone()));
+        let fast_router = FastPathRouter::new(settings);
 
         let ai_client = AIClient::from_settings(settings).ok();
         let gemini_client = settings
@@ -213,6 +216,7 @@ impl JarvisAgent {
             ai_client,
             gemini_client,
             fallback,
+            fast_router,
             registry,
             hyprland,
             screen,
@@ -254,6 +258,18 @@ impl JarvisAgent {
         self.session_ended.store(true, Ordering::SeqCst);
     }
 
+    pub fn registry(&self) -> &Arc<ToolRegistry> {
+        &self.registry
+    }
+
+    pub fn hyprland(&self) -> &Arc<HyprlandController> {
+        &self.hyprland
+    }
+
+    pub fn fast_router(&self) -> &FastPathRouter {
+        &self.fast_router
+    }
+
     /// Situational context snapshot (focused window, active workspace, current time)
     pub async fn get_system_context(&self) -> String {
         let now = Local::now().format("%A, %B %d, %Y at %I:%M %p").to_string();
@@ -277,6 +293,45 @@ impl JarvisAgent {
             info!("User dismissal command detected: '{}'", trimmed);
             self.session_ended.store(true, Ordering::SeqCst);
             return Ok("Very well, sir. Have a wonderful day.".to_string());
+        }
+
+        // Fast-path router check (Zero-latency regex or sub-100ms TypeSafe Jev System One)
+        if let Some(action) = self.fast_router.route(trimmed).await {
+            info!("Fast-path action matched in agent: {:?}", action);
+            if matches!(action, FastPathAction::DismissSession) {
+                self.session_ended.store(true, Ordering::SeqCst);
+                return Ok(action.spoken_confirmation().to_string());
+            }
+
+            if let Err(e) = action.execute(&self.registry, &self.hyprland).await {
+                warn!("Fast-path action execution error: {e}");
+            }
+            let conf = action.spoken_confirmation().to_string();
+
+            // Record turn into histories so future conversational turns preserve context
+            {
+                let mut hist = self.gemini_history.lock().await;
+                hist.push(ContentMessage {
+                    role: "user".to_string(),
+                    parts: vec![json!({ "text": trimmed })],
+                });
+                hist.push(ContentMessage {
+                    role: "model".to_string(),
+                    parts: vec![json!({ "text": conf.clone() })],
+                });
+            }
+            {
+                let mut o_hist = self.openai_history.lock().await;
+                o_hist.push(json!({"role": "user", "content": trimmed}));
+                o_hist.push(json!({"role": "assistant", "content": conf.clone()}));
+            }
+            {
+                let mut a_hist = self.anthropic_history.lock().await;
+                a_hist.push(json!({"role": "user", "content": trimmed}));
+                a_hist.push(json!({"role": "assistant", "content": conf.clone()}));
+            }
+
+            return Ok(conf);
         }
 
         let ai_client = match &self.ai_client {
@@ -426,10 +481,17 @@ impl JarvisAgent {
                     hist.push(content);
                 }
 
+                let is_single_call = function_calls.len() == 1;
+                let mut direct_action_reply = None;
+
                 for (call_name, call_args) in function_calls {
                     let result_str = self
                         .execute_tool_action(&call_name, call_args, &active_model)
                         .await;
+
+                    if is_single_call && is_terminal_action_tool(&call_name) {
+                        direct_action_reply = Some(action_confirmation_reply(&call_name, &result_str));
+                    }
 
                     {
                         let mut hist = self.gemini_history.lock().await;
@@ -445,6 +507,12 @@ impl JarvisAgent {
                             })],
                         });
                     }
+                }
+
+                if let Some(reply) = direct_action_reply {
+                    final_text_reply = reply;
+                    model_succeeded = true;
+                    break;
                 }
             }
 
@@ -555,11 +623,18 @@ impl JarvisAgent {
                 }));
             }
 
+            let is_single_call = response.tool_calls.len() == 1;
+            let mut direct_action_reply = None;
+
             // Execute each tool call and push result
             for tc in response.tool_calls {
                 let result_str = self
                     .execute_tool_action(&tc.name, tc.args, &self.model_name)
                     .await;
+
+                if is_single_call && is_terminal_action_tool(&tc.name) {
+                    direct_action_reply = Some(action_confirmation_reply(&tc.name, &result_str));
+                }
 
                 {
                     let mut hist = self.openai_history.lock().await;
@@ -569,6 +644,11 @@ impl JarvisAgent {
                         "content": result_str
                     }));
                 }
+            }
+
+            if let Some(reply) = direct_action_reply {
+                info!("Jarvis Response: \"{reply}\"");
+                return Ok(reply);
             }
         }
 
@@ -759,6 +839,85 @@ impl JarvisAgent {
 
 pub fn friendly_tool_description(call_name: &str, call_args: &Value) -> String {
     crate::ui::tool_notification_info(call_name, call_args).description
+}
+
+pub fn is_terminal_action_tool(tool_name: &str) -> bool {
+    matches!(
+        tool_name,
+        "play_media"
+            | "resume_media"
+            | "media_play_pause"
+            | "media_next"
+            | "media_previous"
+            | "media_stop"
+            | "adjust_volume"
+            | "switch_workspace"
+            | "launch_application"
+            | "focus_application"
+            | "close_window"
+            | "open_youtube"
+            | "send_shortcut"
+            | "type_text"
+            | "press_key"
+            | "scroll"
+            | "lock_screen"
+            | "logout_system"
+            | "reboot_system"
+            | "shutdown_system"
+            | "set_reminder"
+            | "clear_reminders"
+            | "create_note"
+            | "create_project"
+            | "display_research_in_neovim"
+            | "localsend_share"
+            | "dismiss_session"
+            | "set_theme"
+            | "toggle_bluetooth"
+    )
+}
+
+pub fn action_confirmation_reply(tool_name: &str, result_str: &str) -> String {
+    let lower = result_str.to_lowercase();
+    if lower.contains("cancelled") || lower.contains("aborted") {
+        return "Cancelled.".to_string();
+    }
+    if lower.contains("failed") || lower.contains("error") {
+        return "Action failed.".to_string();
+    }
+    if lower.contains("could not find") {
+        if result_str.len() <= 60 {
+            return result_str.to_string();
+        }
+        return "Could not find requested target.".to_string();
+    }
+
+    match tool_name {
+        "play_media" | "resume_media" | "open_youtube" => "Playing.".to_string(),
+        "media_play_pause" => "Toggled.".to_string(),
+        "media_next" => "Next track.".to_string(),
+        "media_previous" => "Previous track.".to_string(),
+        "media_stop" => "Stopped.".to_string(),
+        "adjust_volume" => "Adjusted.".to_string(),
+        "switch_workspace" => "Switched.".to_string(),
+        "launch_application" => "Opened.".to_string(),
+        "focus_application" => "Focused.".to_string(),
+        "close_window" => "Closed.".to_string(),
+        "send_shortcut" | "type_text" | "press_key" | "scroll" => "Done.".to_string(),
+        "lock_screen" => "Locked.".to_string(),
+        "logout_system" => "Logging out.".to_string(),
+        "reboot_system" => "Rebooting.".to_string(),
+        "shutdown_system" => "Shutting down.".to_string(),
+        "set_reminder" => "Reminder set.".to_string(),
+        "clear_reminders" => "Reminders cleared.".to_string(),
+        "create_note" => "Note saved.".to_string(),
+        "create_project" => "Scaffolding.".to_string(),
+        "display_research_in_neovim" => "Research ready.".to_string(),
+        "localsend_share" => "Shared.".to_string(),
+        "set_theme" => "Theme updated.".to_string(),
+        "toggle_bluetooth" => "Bluetooth updated.".to_string(),
+        "dismiss_session" => "Very well, sir. Have a wonderful day.".to_string(),
+        _ => "Done.".to_string(),
+    }
 }
 
 #[cfg(test)]

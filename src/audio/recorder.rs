@@ -21,7 +21,7 @@ pub struct AudioRecorder {
 
 impl Default for AudioRecorder {
     fn default() -> Self {
-        Self::new(16000, 512, 1.3, 25.0, 0.28, 0.0008)
+        Self::new(16000, 512, 0.85, 25.0, 0.28, 0.0008)
     }
 }
 

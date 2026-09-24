@@ -1,5 +1,5 @@
 use crate::ai::stt::SpeechToText;
-use crate::ai::{is_exit_command, JarvisAgent};
+use crate::ai::{is_exit_command, FastPathAction, JarvisAgent};
 use crate::audio::ducking::AudioDucker;
 use crate::audio::playback::play_wake_chime;
 use crate::audio::recorder::AudioRecorder;
@@ -350,6 +350,33 @@ pub async fn run_voice_activation(
 
         info!("User voice transcript: \"{transcript}\"");
         println!("\x1b[1;32mUser:\x1b[0m \"{transcript}\"");
+
+        // Step 4: Fast-path router check (Zero-latency regex or sub-100ms TypeSafe Jev System One)
+        if let Some(action) = agent.fast_router().route(&transcript).await {
+            info!("Fast-path action matched: {:?}", action);
+            clear_busy();
+            let is_dismiss = matches!(action, FastPathAction::DismissSession);
+            let conf = action.spoken_confirmation();
+
+            if let Err(e) = action.execute(agent.registry(), agent.hyprland()).await {
+                warn!("Fast-path action execution error: {e}");
+            }
+
+            println!("\x1b[1;36m󰚩 Jarvis:\x1b[0m {conf}");
+            set_speaking(conf);
+            hud.show_speaking(Some(conf)).await;
+            if let Some(ref t) = tts {
+                let _ = t.speak(conf).await;
+            }
+
+            if is_dismiss {
+                break;
+            }
+            is_first_turn = false;
+            sleep(Duration::from_millis(50)).await;
+            continue;
+        }
+
         set_processing(&transcript);
         hud.show_thinking(Some(&format!("\"{transcript}\""))).await;
 

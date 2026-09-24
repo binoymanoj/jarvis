@@ -34,6 +34,7 @@ pub struct TomlAiConfig {
     pub groq_api_key: Option<String>,
     pub openrouter_api_key: Option<String>,
     pub cli_tool: Option<String>,
+    pub typesafe_api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -85,6 +86,7 @@ pub struct Settings {
     pub anthropic_api_key: Option<String>,
     pub groq_api_key: Option<String>,
     pub openrouter_api_key: Option<String>,
+    pub typesafe_api_key: Option<String>,
 
     // CLI Coding AI Tool ("claude", "codex", "agy")
     pub cli_ai_tool: String,
@@ -172,6 +174,7 @@ impl Default for Settings {
             anthropic_api_key: None,
             groq_api_key: None,
             openrouter_api_key: None,
+            typesafe_api_key: None,
             cli_ai_tool: "agy".to_string(),
             editor: "nvim".to_string(),
             terminal: "kitty".to_string(),
@@ -189,7 +192,7 @@ impl Default for Settings {
             piper_voice: "en_GB-alan-medium".to_string(),
             sample_rate: 16000,
             channels: 1,
-            silence_threshold_seconds: 1.3,
+            silence_threshold_seconds: 0.85,
             max_recording_seconds: 25.0,
             initial_listen_timeout: 10.0,
             followup_listen_timeout: 8.0,
@@ -233,6 +236,9 @@ openai_api_key = ""
 anthropic_api_key = ""
 groq_api_key = ""
 openrouter_api_key = ""
+
+# TypeSafe AI Jev (Fast-Path 70ms intent routing and type-safe decisions)
+typesafe_api_key = ""
 
 # Autonomous coding CLI assistant ("claude", "codex", "agy")
 cli_tool = "agy"
@@ -279,7 +285,7 @@ edge_voice = "en-GB-RyanNeural"
 piper_voice = "en_GB-alan-medium"
 
 # VAD and Silence detection
-silence_threshold_seconds = 1.3
+silence_threshold_seconds = 0.85
 initial_listen_timeout = 10.0
 followup_listen_timeout = 8.0
 max_recording_seconds = 25.0
@@ -400,6 +406,11 @@ impl Settings {
                 s.openrouter_api_key = Some(val.trim().to_string());
             }
         }
+        if let Ok(val) = env::var("TYPESAFE_API_KEY") {
+            if !val.trim().is_empty() {
+                s.typesafe_api_key = Some(val.trim().to_string());
+            }
+        }
 
         if let Ok(val) = env::var("JARVIS_AI_PROVIDER") {
             s.ai_provider = val.to_lowercase().trim().to_string();
@@ -498,6 +509,11 @@ impl Settings {
             if let Some(k) = ai.openrouter_api_key {
                 if !k.trim().is_empty() {
                     s.openrouter_api_key = Some(k.trim().to_string());
+                }
+            }
+            if let Some(k) = ai.typesafe_api_key {
+                if !k.trim().is_empty() {
+                    s.typesafe_api_key = Some(k.trim().to_string());
                 }
             }
             if let Some(c) = ai.cli_tool {
