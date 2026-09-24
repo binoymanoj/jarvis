@@ -1,4 +1,5 @@
 use crate::core::error::Result;
+use crate::core::is_test_environment;
 use crate::tools::Tool;
 use async_trait::async_trait;
 use regex::Regex;
@@ -523,6 +524,25 @@ impl MediaManager {
         best_match.map(|(_, m)| m)
     }
 
+    pub fn build_player_command(
+        player_bin: &str,
+        file_path: &Path,
+        fullscreen: bool,
+    ) -> Command {
+        let mut cmd = Command::new(player_bin);
+        if player_bin.contains("mpv") {
+            if fullscreen {
+                cmd.arg("--fs");
+            }
+            cmd.arg("--save-position-on-quit");
+            cmd.arg("--keep-open=yes");
+        } else if fullscreen {
+            cmd.arg("--fullscreen");
+        }
+        cmd.arg(file_path);
+        cmd
+    }
+
     pub async fn play_video_file(
         &self,
         file_path: &Path,
@@ -543,20 +563,21 @@ impl MediaManager {
             ));
         };
 
-        let mut cmd = Command::new(&player_bin);
-        if player_bin.contains("mpv") {
-            if fullscreen {
-                cmd.arg("--fs");
-            }
-            cmd.arg("--save-position-on-quit");
-            cmd.arg("--keep-open=yes");
-        } else {
-            if fullscreen {
-                cmd.arg("--fullscreen");
-            }
-            cmd.arg(file_path);
+        let ep_detail = match (season, episode) {
+            (Some(s), Some(e)) => format!(" Season {s} Episode {e}"),
+            (_, Some(e)) => format!(" Episode {e}"),
+            _ => String::new(),
+        };
+
+        if is_test_environment() {
+            info!(
+                "[test mode] Skipping spawning media player '{player_bin}' for {:?}",
+                file_path
+            );
+            return Ok(format!("Playing {title}{ep_detail} in fullscreen."));
         }
 
+        let mut cmd = Self::build_player_command(&player_bin, file_path, fullscreen);
         cmd.stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -574,12 +595,6 @@ impl MediaManager {
             "Launched media player '{player_bin}' playing {:?} (fullscreen: {fullscreen})",
             file_path
         );
-
-        let ep_detail = match (season, episode) {
-            (Some(s), Some(e)) => format!(" Season {s} Episode {e}"),
-            (_, Some(e)) => format!(" Episode {e}"),
-            _ => String::new(),
-        };
 
         if !crate::ui::TaskNotifier::global().is_active() {
             crate::ui::send_desktop_notification(
@@ -1079,5 +1094,71 @@ mod tests {
         assert_eq!(m.season, Some(1));
         assert_eq!(m.episode, Some(12));
         assert!(m.file_path.to_str().unwrap().contains("S01E12"));
+    }
+
+    #[test]
+    fn test_build_player_command_mpv_fullscreen() {
+        let file = Path::new("/movies/Prison Break/Season 1/S01E12.mkv");
+        let cmd = MediaManager::build_player_command("mpv", file, true);
+        let args: Vec<String> = cmd
+            .as_std()
+            .get_args()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "--fs".to_string(),
+                "--save-position-on-quit".to_string(),
+                "--keep-open=yes".to_string(),
+                "/movies/Prison Break/Season 1/S01E12.mkv".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_player_command_mpv_windowed() {
+        let file = Path::new("/movies/Prison Break/Season 1/S01E12.mkv");
+        let cmd = MediaManager::build_player_command("mpv", file, false);
+        let args: Vec<String> = cmd
+            .as_std()
+            .get_args()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "--save-position-on-quit".to_string(),
+                "--keep-open=yes".to_string(),
+                "/movies/Prison Break/Season 1/S01E12.mkv".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_player_command_vlc_fullscreen() {
+        let file = Path::new("/movies/test.mp4");
+        let cmd = MediaManager::build_player_command("vlc", file, true);
+        let args: Vec<String> = cmd
+            .as_std()
+            .get_args()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec!["--fullscreen".to_string(), "/movies/test.mp4".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_build_player_command_vlc_windowed() {
+        let file = Path::new("/movies/test.mp4");
+        let cmd = MediaManager::build_player_command("vlc", file, false);
+        let args: Vec<String> = cmd
+            .as_std()
+            .get_args()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(args, vec!["/movies/test.mp4".to_string()]);
     }
 }
