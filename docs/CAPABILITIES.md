@@ -17,21 +17,22 @@ Jarvis is a voice-first, multi-turn AI desktop assistant built specifically for 
 10. [Wayland Clipboard Management](#10-wayland-clipboard-management)
 11. [LocalSend Synchronization & Seamless Sharing (`localsend_share`)](#11-localsend-synchronization--seamless-sharing-localsend_share)
 12. [Deep Research & Floating Neovim Markdown Viewer (`display_research_in_neovim`)](#12-deep-research--floating-neovim-markdown-viewer-display_research_in_neovim)
-13. [System Power, Themed Confirmation TUI & Diagnostics](#13-system-power-themed-confirmation-tui--diagnostics)
-14. [Multimodal Screen Perception & Vision](#14-multimodal-screen-perception--vision)
-15. [Web & Media Navigation](#15-web--media-navigation)
-16. [Quickshell HUD Overlay & Dynamic Theming](#16-quickshell-hud-overlay--dynamic-theming)
-17. [Audio Pipeline & Voice Engine](#17-audio-pipeline--voice-engine)
-18. [Hands-Free Wake Word Detection ("Hey Jarvis")](#18-hands-free-wake-word-detection-hey-jarvis)
-19. [Omarchy Menu Bar Icon & Popover Controls](#19-omarchy-menu-bar-icon--popover-controls)
-20. [Push-to-Talk, Hotkeys & Emergency Kill Switch](#20-push-to-talk-hotkeys--emergency-kill-switch)
-21. [Systemd Background Service & Daemon](#21-systemd-background-service--daemon)
-22. [Continuous Conversation & Kill Words](#22-continuous-conversation--kill-words)
-23. [Activity History & Log Streaming (`jarvis.log`)](#23-activity-history--log-streaming-jarvislog)
-24. [Quota Resiliency & Multi-Tier Fallback](#24-quota-resiliency--multi-tier-fallback)
-25. [Performance Benchmarks & Resource Profiles](#25-performance-benchmarks--resource-profiles)
-26. [CLI Commands Reference](#26-cli-commands-reference)
-27. [Desktop Notification System & Task Progress Indicators](#27-desktop-notification-system--task-progress-indicators)
+13. [Instant Google Meet Meetings (`create_quick_meeting`)](#13-instant-google-meet-meetings-create_quick_meeting)
+14. [System Power, Themed Confirmation TUI & Diagnostics](#14-system-power-themed-confirmation-tui--diagnostics)
+15. [Multimodal Screen Perception & Vision](#15-multimodal-screen-perception--vision)
+16. [Web & Media Navigation](#16-web--media-navigation)
+17. [Quickshell HUD Overlay & Dynamic Theming](#17-quickshell-hud-overlay--dynamic-theming)
+18. [Audio Pipeline & Voice Engine](#18-audio-pipeline--voice-engine)
+19. [Hands-Free Wake Word Detection ("Hey Jarvis")](#19-hands-free-wake-word-detection-hey-jarvis)
+20. [Omarchy Menu Bar Icon & Popover Controls](#20-omarchy-menu-bar-icon--popover-controls)
+21. [Push-to-Talk, Hotkeys & Emergency Kill Switch](#21-push-to-talk-hotkeys--emergency-kill-switch)
+22. [Systemd Background Service & Daemon](#22-systemd-background-service--daemon)
+23. [Continuous Conversation & Kill Words](#23-continuous-conversation--kill-words)
+24. [Activity History & Log Streaming (`jarvis.log`)](#24-activity-history--log-streaming-jarvislog)
+25. [Quota Resiliency & Multi-Tier Fallback](#25-quota-resiliency--multi-tier-fallback)
+26. [Performance Benchmarks & Resource Profiles](#26-performance-benchmarks--resource-profiles)
+27. [CLI Commands Reference](#27-cli-commands-reference)
+28. [Desktop Notification System & Task Progress Indicators](#28-desktop-notification-system--task-progress-indicators)
 
 
 ---
@@ -335,7 +336,27 @@ When you ask for research, in-depth technical analysis, documentation, or study 
 
 ---
 
-## 13. System Power, Themed Confirmation TUI & Diagnostics
+## 13. Instant Google Meet Meetings (`create_quick_meeting`)
+
+Instantly start and enter a new Google Meet conference with zero manual browser navigation.
+
+### How It Works
+* **Zero-Latency Launch**: Launches `https://meet.google.com/new` via `omarchy-launch-browser`.
+* **Dynamic Room Code Resolution**: Actively queries Hyprland IPC window titles (`hyprland.get_clients()`) to capture the redirected Google Meet room code (`[a-z]{3}-[a-z]{4}-[a-z]{3}`).
+* **Automatic Clipboard Synchronization**: As soon as the room code resolves (e.g. `https://meet.google.com/roa-bpzs-hke`), the full meeting URL is placed onto the system clipboard (`wl-copy`), ready to paste into chat, Slack, or email (`SUPER + V` / `Ctrl + V`).
+* **Sub-100ms Fast-Path & JEV Routing**: Commands like `"create a quick meeting"`, `"start a meeting"`, or `"new google meet"` match directly via local rule match (<0.1ms) or Jev Choice intent evaluation (~70ms), bypassing long LLM round trips.
+* **Instant Voice Confirmation**: Jarvis immediately confirms with `"Meeting started."`.
+
+### Voice Commands
+* *"Jarvis, create a quick meeting"*
+* *"Start a meeting"*
+* *"Create a new Google Meet"*
+* *"Start an instant meeting"*
+* *"New meeting"*
+
+---
+
+## 14. System Power, Themed Confirmation TUI & Diagnostics
 
 Perform system power operations, Bluetooth management, and network throughput testing.
 
@@ -365,7 +386,7 @@ To protect your workstation against accidental shutdowns, reboots, logouts, or w
 
 ---
 
-## 14. Multimodal Screen Perception & Vision
+## 15. Multimodal Screen Perception & Vision
 
 Ask Jarvis to visually inspect what is currently on your screen.
 
@@ -382,7 +403,7 @@ Ask Jarvis to visually inspect what is currently on your screen.
 
 ---
 
-## 15. Web & Media Navigation
+## 16. Web & Media Navigation
 
 Instantly access search engines, online videos, and websites.
 
@@ -398,7 +419,7 @@ Instantly access search engines, online videos, and websites.
 
 ---
 
-## 16. Quickshell HUD Overlay & Dynamic Theming
+## 17. Quickshell HUD Overlay & Dynamic Theming
 
 A custom floating Heads-Up Display built using **Quickshell** matching the **Omarchy Linux** aesthetic.
 
@@ -417,7 +438,7 @@ A custom floating Heads-Up Display built using **Quickshell** matching the **Oma
 
 ---
 
-## 17. Audio Pipeline & Voice Engine
+## 18. Audio Pipeline & Voice Engine
 
 Optimized for near-instantaneous speech recognition and natural local voice synthesis.
 
@@ -427,7 +448,7 @@ Optimized for near-instantaneous speech recognition and natural local voice synt
 
 ---
 
-## 18. Hands-Free Wake Word Detection ("Hey Jarvis")
+## 19. Hands-Free Wake Word Detection ("Hey Jarvis")
 
 Jarvis features continuous, zero-latency offline wake word detection powered by `openWakeWord` and the pre-trained `hey_jarvis_v0.1.onnx` neural model.
 * **Hands-Free Activation**: Speak *"Hey Jarvis"* (or configured *"Hey <name>"*) anytime to awaken the assistant hands-free. Requiring the "Hey" prefix prevents accidental triggers from ambient chatter or casually saying "Jarvis" in conversation.
@@ -438,7 +459,7 @@ Jarvis features continuous, zero-latency offline wake word detection powered by 
 
 ---
 
-## 19. Omarchy Menu Bar Icon & Popover Controls
+## 20. Omarchy Menu Bar Icon & Popover Controls
 
 Jarvis integrates natively into the **Omarchy Top Bar** (Quickshell) as a first-class bar-widget plugin (`~/.config/omarchy/plugins/jarvis/`).
 
@@ -462,7 +483,7 @@ Clicking the menu bar icon reveals a floating `KeyboardPanel` popover offering q
 
 ---
 
-## 20. Push-to-Talk, Hotkeys & Emergency Kill Switch
+## 21. Push-to-Talk, Hotkeys & Emergency Kill Switch
 
 Configured natively in `~/.config/hypr/bindings.lua`:
 
@@ -500,7 +521,7 @@ journalctl --user -u jarvis -f
 
 ---
 
-## 22. Continuous Conversation & Kill Words
+## 23. Continuous Conversation & Kill Words
 
 Jarvis maintains context across sequential commands within the same session. After executing an action, Jarvis remains active and attentive for follow-up requests.
 
@@ -516,7 +537,7 @@ Jarvis will acknowledge with a polite farewell and cleanly hide the HUD overlay.
 
 ---
 
-## 23. Activity History & Log Streaming (`jarvis.log`)
+## 24. Activity History & Log Streaming (`jarvis.log`)
 
 Jarvis maintains a persistent, structured, append-only execution log of all spoken commands, transcribed queries, tool calls, model responses, system events, and diagnostic traces at `~/.local/state/jarvis/jarvis.log`.
 
@@ -542,7 +563,7 @@ jarvis --logs-path
 
 ---
 
-## 24. Quota Resiliency & Multi-Tier Fallback
+## 25. Quota Resiliency & Multi-Tier Fallback
 
 Eliminates API quota lockouts and delays through automatic cascading fallback:
 1. **`gemini-3.5-flash-lite`** *(Primary)*: Sub-second response time with high free-tier rate limits.
@@ -556,7 +577,7 @@ If any model encounters a 429 quota exhaustion or rate limit, Jarvis seamlessly 
 
 ---
 
-## 25. Performance Benchmarks & Resource Profiles
+## 26. Performance Benchmarks & Resource Profiles
 
 For granular micro-benchmarks, hardware profiling, latency timelines, and idle/active memory graphs, refer to the full report in:
 **[Performance & Specifications Document](file:///home/binoy/Codes/personal/jarvis/docs/PERFORMANCE_AND_SPECS.md)**
@@ -573,7 +594,7 @@ For granular micro-benchmarks, hardware profiling, latency timelines, and idle/a
 
 ---
 
-## 26. CLI Commands Reference
+## 27. CLI Commands Reference
 
 Jarvis can be invoked directly from the terminal or scripted into custom Hyprland hotkeys:
 
@@ -633,7 +654,7 @@ jarvis --logs-path
 
 ---
 
-## 27. Desktop Notification System & Task Progress Indicators
+## 28. Desktop Notification System & Task Progress Indicators
 
 Jarvis integrates an intelligent, zero-spam desktop notification system designed specifically for the Omarchy Linux desktop and Hyprland. Built around [`TaskNotifier`](file:///home/binoy/Codes/personal/jarvis/src/ui/notification.rs), notifications provide immediate visual feedback across three coordinated desktop surfaces without cluttering your screen.
 

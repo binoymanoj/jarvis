@@ -108,9 +108,9 @@ During active conversational turns (wake word triggered → audio recorded → G
 
 ---
 
-## 3. Comprehensive Hands-Free Tool Palette (55 Tools)
+## 3. Comprehensive Hands-Free Tool Palette (56 Tools)
 
-Jarvis registers **55 native tools** directly inside Gemini's tool declaration registry:
+Jarvis registers **56 native tools** directly inside Gemini's tool declaration registry:
 
 1. **Virtual Input & Typing**: `type_text`, `press_key`, `send_shortcut`, `scroll`.
 2. **Linux Shell**: `execute_command`.
@@ -128,4 +128,5 @@ Jarvis registers **55 native tools** directly inside Gemini's tool declaration r
 14. **Notes & Thought Capture**: `create_note`, `list_notes`.
 15. **Autonomous Project & Code Generation**: `create_project`, `delegate_to_antigravity`.
 16. **Screen Multimodal Vision**: `inspect_screen`.
-17. **Conversational Lifecycle**: `dismiss_session`.
+17. **Instant Meetings**: `create_quick_meeting`.
+18. **Conversational Lifecycle**: `dismiss_session`.

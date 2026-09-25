@@ -79,16 +79,21 @@ Launch full-blown multi-window development and productivity environments across 
 * **YouTube Playback**: "Open MKBHD's latest video on YouTube".
 * **Direct URLs**: "Open github.com".
 
-### 14. 👁️ Screen Perception & Multimodal Vision
+### 14. 📹 Instant Google Meet Meetings
+* **One-Step Conference Launch**: "Create a quick meeting", "Start a meeting", "New Google Meet", "Instant meeting".
+* **Auto-Copied Room Link**: Launches `https://meet.google.com/new` in your default browser, automatically captures the assigned Google Meet room URL (`https://meet.google.com/xxx-yyyy-zzz`) via Hyprland IPC window title introspection, and copies it directly to your system clipboard ready to paste into chat or email.
+* **Sub-100ms Intent Routing**: Directly fast-routed via JEV/local intent evaluation with instant confirmation ("Meeting started.").
+
+### 15. 👁️ Screen Perception & Multimodal Vision
 * "Take a look at my screen and help me debug this code error".
 * Takes an instantaneous snapshot via `grim` and uses Gemini's multimodal vision to analyze active windows and errors.
 
-### 15. 🎙️ Hands-Free Wake Word ("Hey Jarvis")
+### 16. 🎙️ Hands-Free Wake Word ("Hey Jarvis")
 * **Continuous Offline Detection**: Powered by `openWakeWord` and `hey_jarvis_v0.1.onnx` with zero cloud latency and <0.8% CPU usage.
 * **Hands-Free Activation**: Speak *"Hey Jarvis"* (or custom *"Hey <name>"*) to immediately trigger the conversational HUD without touching the keyboard. Requiring the "Hey" prefix eliminates false activations from casual mentions of "Jarvis" or ambient room conversation.
 * **Background Daemon & Systemd**: Managed seamlessly via user systemd service (`systemctl --user start/enable jarvis`).
 
-### 16. 📊 Omarchy Top Bar Widget & Popover UI
+### 17. 📊 Omarchy Top Bar Widget & Popover UI
 * **Live Menu Bar Icon**: Robot glyph (`󰚩`) in the top bar matching active Omarchy theme colors.
 * **Microphone Active Dot**: A bright, pulsing red indicator dot appears strictly when the microphone is recording audio.
 * **Interactive Control Popover**: Left-click to open a floating panel with instant controls:
@@ -98,7 +103,7 @@ Launch full-blown multi-window development and productivity environments across 
   - System controls: **Restart** (`󰑐`) to reload the daemon and widget, and **Quit Jarvis** (`󰗼`) to completely stop all processes (`systemctl --user stop jarvis`, background daemons, audio) and release all CPU & memory.
   - Active coding CLI indicator.
 
-### 17. 🔔 Desktop Notifications & Active Progress Indicators
+### 18. 🔔 Desktop Notifications & Active Progress Indicators
 * **In-Place Progress Toasts**: Background and multi-step tasks (battery diagnostics, network speedtests, media playback, deep research generation, and project scaffolding) trigger dynamic in-place desktop toasts (`TaskNotifier`). The notification updates smoothly as steps complete and auto-dismisses after 4 seconds.
 * **Targeted System Notifications**: Dedicated notification feedback for key events:
   - 󰚩 Wake Word toggled on/off (`jarvis -W`).
