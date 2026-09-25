@@ -23,6 +23,7 @@ pub enum FastPathAction {
     VolumeAdjust(i32),
     LockScreen,
     SwitchWorkspace(i64),
+    CreateMeeting,
     DismissSession,
 }
 
@@ -67,6 +68,9 @@ impl FastPathAction {
                 hyprland.change_workspace(*id as i32).await?;
                 Ok(format!("Switched to workspace {id}."))
             }
+            FastPathAction::CreateMeeting => {
+                registry.execute_tool("create_quick_meeting", json!({})).await
+            }
             FastPathAction::DismissSession => {
                 Ok("Very well, sir. Have a wonderful day.".to_string())
             }
@@ -84,6 +88,7 @@ impl FastPathAction {
             FastPathAction::VolumeAdjust(_) => "Volume down.",
             FastPathAction::LockScreen => "Locked.",
             FastPathAction::SwitchWorkspace(_) => "Switched.",
+            FastPathAction::CreateMeeting => "Meeting started.",
             FastPathAction::DismissSession => "Very well, sir. Have a wonderful day.",
         }
     }
@@ -165,6 +170,7 @@ impl JevClient {
                     "volume_down": "Lower or decrease audio volume, softer",
                     "volume_mute": "Mute or silence audio output",
                     "lock_screen": "Lock the screen or computer",
+                    "create_meeting": "Start or create an instant Google Meet meeting or quick meeting",
                     "session_exit": "User is finished, saying goodbye, or dismissing the assistant",
                     "none": "Open-ended question, search, complex task, or non-fixed action"
                 }
@@ -192,6 +198,7 @@ impl JevClient {
                     "volume_down" => Some(FastPathAction::VolumeAdjust(-10)),
                     "volume_mute" => Some(FastPathAction::VolumeMute),
                     "lock_screen" => Some(FastPathAction::LockScreen),
+                    "create_meeting" => Some(FastPathAction::CreateMeeting),
                     "session_exit" => Some(FastPathAction::DismissSession),
                     _ => None,
                 }
@@ -304,6 +311,24 @@ pub fn local_match_fast_path(transcript: &str) -> Option<FastPathAction> {
         | "lock system"
         | "lock pc"
         | "lock laptop" => return Some(FastPathAction::LockScreen),
+
+        "create a quick meeting"
+        | "create quick meeting"
+        | "start a quick meeting"
+        | "start quick meeting"
+        | "quick meeting"
+        | "create a meeting"
+        | "create meeting"
+        | "start a meeting"
+        | "start meeting"
+        | "new meeting"
+        | "google meet"
+        | "start google meet"
+        | "new google meet"
+        | "open google meet"
+        | "instant meeting"
+        | "create an instant meeting"
+        | "start an instant meeting" => return Some(FastPathAction::CreateMeeting),
 
         _ => {}
     }
@@ -437,6 +462,26 @@ mod tests {
         assert_eq!(
             local_match_fast_path("play episode 12 from prison break season 1"),
             None
+        );
+    }
+
+    #[test]
+    fn test_local_match_fast_path_meeting() {
+        assert_eq!(
+            local_match_fast_path("create a quick meeting"),
+            Some(FastPathAction::CreateMeeting)
+        );
+        assert_eq!(
+            local_match_fast_path("start a meeting"),
+            Some(FastPathAction::CreateMeeting)
+        );
+        assert_eq!(
+            local_match_fast_path("google meet"),
+            Some(FastPathAction::CreateMeeting)
+        );
+        assert_eq!(
+            local_match_fast_path("new meeting"),
+            Some(FastPathAction::CreateMeeting)
         );
     }
 }

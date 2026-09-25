@@ -133,7 +133,7 @@ fn test_gemini_tools_declarations_against_registry() {
     let decls = list[0]["functionDeclarations"]
         .as_array()
         .expect("Should have functionDeclarations");
-    assert_eq!(decls.len(), 55);
+    assert_eq!(decls.len(), 56);
 
     for decl in decls {
         assert!(decl["name"].is_string());

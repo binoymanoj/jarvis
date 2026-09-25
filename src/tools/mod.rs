@@ -6,6 +6,7 @@ pub mod email;
 pub mod hyprland;
 pub mod localsend;
 pub mod media;
+pub mod meeting;
 pub mod notes;
 pub mod omarchy;
 pub mod power;
@@ -198,7 +199,7 @@ pub fn build_tool_registry(
     reg.register(omarchy::SetThemeTool::new(omarchy.clone()));
     reg.register(omarchy::GetBatteryTool::new(omarchy.clone()));
     reg.register(omarchy::LaunchApplicationTool::new(omarchy.clone()));
-    reg.register(omarchy::NotifyTool::new(omarchy));
+    reg.register(omarchy::NotifyTool::new(omarchy.clone()));
 
     // 4. Register Virtual Input Tools (4)
     reg.register(virtual_input::TypeTextTool::new(virtual_input.clone()));
@@ -220,7 +221,7 @@ pub fn build_tool_registry(
 
     // 7. Register Clipboard Tools (2)
     reg.register(clipboard::GetClipboardTool::new(clipboard.clone()));
-    reg.register(clipboard::SetClipboardTool::new(clipboard));
+    reg.register(clipboard::SetClipboardTool::new(clipboard.clone()));
 
     // 8. Register Power & Diagnostics Tools (7)
     reg.register(power::LockScreenTool::new(power.clone()));
@@ -242,7 +243,7 @@ pub fn build_tool_registry(
     // 10. Register Web Navigator Tools (3)
     reg.register(web::OpenUrlTool::new(web.clone()));
     reg.register(web::SearchWebTool::new(web.clone()));
-    reg.register(web::OpenYoutubeTool::new(web));
+    reg.register(web::OpenYoutubeTool::new(web.clone()));
 
     // 11. Register Screen Perception Tool (1)
     reg.register(screen::InspectScreenTool::new(screen));
@@ -282,7 +283,16 @@ pub fn build_tool_registry(
     let research = Arc::new(research::ResearchManager::new());
     reg.register(research::DisplayResearchInNeovimTool::new(research));
 
-    // 19. Dismiss Session Tool (1)
+    // 19. Register Quick Meeting Tool (1)
+    let meeting = Arc::new(meeting::MeetingManager::new(
+        hyprland,
+        clipboard,
+        omarchy,
+        web,
+    ));
+    reg.register(meeting::CreateQuickMeetingTool::new(meeting));
+
+    // 20. Dismiss Session Tool (1)
     reg.register(DismissSessionTool::new(session_ended_flag));
 
     reg
@@ -298,18 +308,20 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let registry = build_tool_registry(&settings, flag);
 
-        // All 55 native tools must be successfully registered!
-        assert_eq!(registry.count(), 55);
+        // All 56 native tools must be successfully registered!
+        assert_eq!(registry.count(), 56);
 
         // Ensure key tools are retrievable
         assert!(registry.get("switch_workspace").is_some());
         assert!(registry.get("focus_application").is_some());
         assert!(registry.get("execute_command").is_some());
+        assert!(registry.get("create_quick_meeting").is_some());
         assert!(registry.get("media_play_pause").is_some());
         assert!(registry.get("play_media").is_some());
         assert!(registry.get("resume_media").is_some());
         assert!(registry.get("localsend_share").is_some());
         assert!(registry.get("display_research_in_neovim").is_some());
+        assert!(registry.get("create_quick_meeting").is_some());
         assert!(registry.get("launch_workflow").is_some());
         assert!(registry.get("create_project").is_some());
         assert!(registry.get("open_file_in_editor").is_some());
@@ -319,6 +331,6 @@ mod tests {
         let decls = registry.gemini_function_declarations();
         assert!(decls.is_array());
         let list = decls[0]["functionDeclarations"].as_array().unwrap();
-        assert_eq!(list.len(), 55);
+        assert_eq!(list.len(), 56);
     }
 }

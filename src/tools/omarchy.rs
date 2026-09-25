@@ -77,6 +77,23 @@ impl OmarchyBridge {
         Ok(status.success())
     }
 
+    pub async fn show_osd(&self, icon: &str, message: &str, duration_ms: u64) -> Result<()> {
+        let osd_bin = which::which("omarchy-osd")
+            .unwrap_or_else(|_| PathBuf::from("/usr/bin/omarchy-osd"));
+
+        let _ = Command::new(osd_bin)
+            .arg("-i")
+            .arg(icon)
+            .arg("-m")
+            .arg(message)
+            .arg("-d")
+            .arg(duration_ms.to_string())
+            .output()
+            .await;
+
+        Ok(())
+    }
+
     pub async fn set_volume(&self, adjustment: &str) -> Result<String> {
         self.run("audio output volume", &[adjustment]).await
     }

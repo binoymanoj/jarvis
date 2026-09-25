@@ -11,7 +11,9 @@ use tracing::{debug, error, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentMessage {
+    #[serde(default)]
     pub role: String,
+    #[serde(default)]
     pub parts: Vec<Value>,
 }
 

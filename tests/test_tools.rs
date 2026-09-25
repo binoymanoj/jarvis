@@ -6,12 +6,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[test]
-fn test_all_55_tools_registered() {
+fn test_all_56_tools_registered() {
     let settings = Settings::default();
     let flag = Arc::new(AtomicBool::new(false));
     let reg = build_tool_registry(&settings, flag);
 
-    assert_eq!(reg.count(), 55);
+    assert_eq!(reg.count(), 56);
 
     let tools = [
         "switch_workspace",
@@ -68,6 +68,7 @@ fn test_all_55_tools_registered() {
         "open_file_in_editor",
         "localsend_share",
         "display_research_in_neovim",
+        "create_quick_meeting",
         "dismiss_session",
     ];
 
@@ -170,5 +171,26 @@ async fn test_display_research_in_neovim_tool() {
     assert!(res.is_ok());
     let msg = res.unwrap();
     assert!(msg.contains("Quantum Computing"));
+}
+
+#[tokio::test]
+async fn test_set_and_get_clipboard() {
+    let flag = Arc::new(AtomicBool::new(false));
+    let settings = Settings::default();
+    let reg = build_tool_registry(&settings, flag);
+
+    let res = reg
+        .execute_tool(
+            "set_clipboard",
+            serde_json::json!({ "text": "https://meet.google.com/test-abc-xyz" }),
+        )
+        .await;
+    println!("set_clipboard res: {:?}", res);
+    assert!(res.is_ok());
+
+    let get_res = reg.execute_tool("get_clipboard", serde_json::json!({})).await;
+    println!("get_clipboard res: {:?}", get_res);
+    assert!(get_res.is_ok());
+    assert!(get_res.unwrap().contains("test-abc-xyz"));
 }
 

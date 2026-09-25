@@ -64,18 +64,29 @@ impl ClipboardManager {
             return Ok("No text provided to copy to clipboard.".to_string());
         }
 
-        let mut child = Command::new(&self.wl_copy_bin)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()?;
+        if text.len() <= 65536 {
+            let status = Command::new(&self.wl_copy_bin)
+                .arg("--")
+                .arg(text)
+                .status()
+                .await?;
+            if !status.success() {
+                debug!("wl-copy exited with status {:?}", status.code());
+            }
+        } else {
+            let mut child = Command::new(&self.wl_copy_bin)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()?;
 
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(text.as_bytes()).await?;
-            stdin.flush().await?;
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(text.as_bytes()).await?;
+                stdin.flush().await?;
+            }
+
+            child.wait().await?;
         }
-
-        child.wait().await?;
         debug!("Copied text to clipboard ({} chars)", text.len());
         let preview = if text.len() > 60 {
             format!("{}...", &text[..60])

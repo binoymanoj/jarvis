@@ -79,7 +79,11 @@ Core Guidelines:
      This opens the report in a sleek floating Neovim popup window on the user's desktop.
      Keep your spoken reply to 1 or 2 words (e.g., "Research ready.", "Opened.").
 17. Screen Perception: If the user asks you to look at their screen, inspect a window, or diagnose an error, call `inspect_screen`.
-18. Ongoing Conversation & Dismissal:
+18. Quick Meetings & Google Meet:
+   - When asked to start or create a quick meeting, instant meeting, or Google Meet (e.g., "create a quick meeting", "start a meeting", "new meeting", "google meet"):
+     Immediately call `create_quick_meeting()`.
+     Jarvis launches the meeting in the browser, copies the link to the clipboard, and displays the link with the copy icon on the on-screen display (OSD/HUD).
+19. Ongoing Conversation & Dismissal:
    - Jarvis maintains conversational context across sequential commands within the same session.
    - When the user indicates they are finished, done, or dismisses you (e.g., "that's it", "done", "that's all", "goodbye"), acknowledge politely and call `dismiss_session`.
 19. Multi-Action Requests (CRITICAL):
@@ -876,8 +880,9 @@ pub fn is_terminal_action_tool(tool_name: &str) -> bool {
             | "clear_reminders"
             | "create_note"
             | "create_project"
-            | "display_research_in_neovim"
             | "localsend_share"
+            | "display_research_in_neovim"
+            | "create_quick_meeting"
             | "dismiss_session"
             | "set_theme"
             | "toggle_bluetooth"
@@ -920,6 +925,7 @@ pub fn action_confirmation_reply(tool_name: &str, result_str: &str) -> String {
         "create_note" => "Note saved.".to_string(),
         "create_project" => "Scaffolding.".to_string(),
         "display_research_in_neovim" => "Research ready.".to_string(),
+        "create_quick_meeting" => "Meeting started.".to_string(),
         "localsend_share" => "Shared.".to_string(),
         "set_theme" => "Theme updated.".to_string(),
         "toggle_bluetooth" => "Bluetooth updated.".to_string(),
