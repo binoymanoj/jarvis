@@ -287,7 +287,6 @@ pub fn build_tool_registry(
     let meeting = Arc::new(meeting::MeetingManager::new(
         hyprland,
         clipboard,
-        omarchy,
         web,
     ));
     reg.register(meeting::CreateQuickMeetingTool::new(meeting));

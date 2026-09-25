@@ -2,7 +2,6 @@ use crate::core::error::Result;
 use crate::core::is_test_environment;
 use crate::tools::clipboard::ClipboardManager;
 use crate::tools::hyprland::HyprlandController;
-use crate::tools::omarchy::OmarchyBridge;
 use crate::tools::web::WebNavigator;
 use crate::tools::Tool;
 use async_trait::async_trait;
@@ -16,7 +15,6 @@ use tracing::{debug, info};
 pub struct MeetingManager {
     hyprland: Arc<HyprlandController>,
     clipboard: Arc<ClipboardManager>,
-    omarchy: Arc<OmarchyBridge>,
     web: Arc<WebNavigator>,
 }
 
@@ -24,13 +22,11 @@ impl MeetingManager {
     pub fn new(
         hyprland: Arc<HyprlandController>,
         clipboard: Arc<ClipboardManager>,
-        omarchy: Arc<OmarchyBridge>,
         web: Arc<WebNavigator>,
     ) -> Self {
         Self {
             hyprland,
             clipboard,
-            omarchy,
             web,
         }
     }
@@ -43,7 +39,7 @@ impl MeetingManager {
             .map(|m| m.as_str().to_lowercase())
     }
 
-    /// Creates an instant Google Meet meeting, opens it in the browser, copies link to clipboard, and shows HUD/OSD
+    /// Creates an instant Google Meet meeting, opens it in the browser, and copies link to clipboard
     pub async fn create_quick_meeting(&self) -> Result<String> {
         let base_url = "https://meet.google.com/new";
         info!("Creating quick Google Meet meeting...");
@@ -56,14 +52,12 @@ impl MeetingManager {
         // 1. Launch Google Meet instant meeting URL in the default browser
         self.web.open_url(base_url).await?;
 
-        // 2. Pre-set clipboard to base URL and flash Omarchy OSD HUD with copy icon
+        // 2. Pre-set clipboard to base URL
         let _ = self.clipboard.set_clipboard(base_url).await;
-        let _ = self.omarchy.show_osd("󰆏", base_url, 3000).await;
 
-        // 3. Poll Hyprland window titles for up to 2.5s to capture the resolved meeting code
+        // 3. Poll Hyprland window titles for up to 4.5s to capture the resolved meeting code
         let hyprland = self.hyprland.clone();
         let clipboard = self.clipboard.clone();
-        let omarchy = self.omarchy.clone();
 
         let mut resolved_link = None;
         let start = Instant::now();
@@ -88,7 +82,6 @@ impl MeetingManager {
 
         if let Some(ref link) = resolved_link {
             let _ = clipboard.set_clipboard(link).await;
-            let _ = omarchy.show_osd("󰆏", link, 4000).await;
             info!("Google Meet room resolved: {link}");
             return Ok(format!("Meeting created: {link}. Link copied to clipboard."));
         }
@@ -106,7 +99,6 @@ impl MeetingManager {
                                 let full_url = format!("https://meet.google.com/{code}");
                                 debug!("Background meeting watcher resolved: {full_url}");
                                 let _ = clipboard.set_clipboard(&full_url).await;
-                                let _ = omarchy.show_osd("󰆏", &full_url, 4000).await;
                                 return;
                             }
                         }
@@ -136,7 +128,7 @@ impl Tool for CreateQuickMeetingTool {
     }
 
     fn description(&self) -> &'static str {
-        "Start an instant Google Meet meeting (https://meet.google.com/), open it in the default browser, copy the meeting link to the system clipboard, and display the link with copy icon in the HUD."
+        "Start an instant Google Meet meeting (https://meet.google.com/), open it in the default browser, and copy the meeting link to the system clipboard."
     }
 
     fn parameters_schema(&self) -> Value {
